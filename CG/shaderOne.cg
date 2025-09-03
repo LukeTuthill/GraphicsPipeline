@@ -1,0 +1,84 @@
+
+
+struct VertexDataInput {
+	float4 vertex: POSITION;
+	float3 normal: NORMAL;
+	float3 color: COLOR;
+};
+
+struct VertexDataOutput {
+	float4 projv  : POSITION;
+	float3 normal : TEXCOORD0;
+	float3 xyz : TEXCOORD1;
+	float3 color: COLOR;
+};
+
+struct PixelDataOutput {
+	float3 color: COLOR;
+};
+
+VertexDataOutput VertexMain(VertexDataInput vdi, 
+	uniform float4x4 modelViewProj, uniform float3 tmCenter,
+	float f, float R) {
+
+  VertexDataOutput ret;
+  float3 V0 = vdi.vertex.xyz;
+  float3 O = tmCenter;
+  float3 V1 = O + normalize(V0 - O)*R;
+  float4 morphedXYZ = float4(V0 + (V1-V0)*f, 1.0f);
+  ret.projv = mul(modelViewProj, morphedXYZ);
+//  ret.projv = mul(modelViewProj, vdi.vertex);
+ 
+  ret.normal = vdi.normal;
+  ret.xyz = vdi.vertex.xyz;
+  ret.color = vdi.color;
+
+//  ret.color = tmCenter + float3(.5f, .5f, 150.5f);
+
+  return ret;
+
+}
+
+// add uniform parameters for: 
+//		the ground billboard, 
+//		sampler2D for texture of ground billboard
+PixelDataOutput FragmentMain(VertexDataOutput pdi, uniform float3 eye, 
+	sampler2D tred, sampler2D tgreen, sampler2D tblue) {
+
+  PixelDataOutput ret;
+
+  ret.color = pdi.color;
+
+//  ret.color.r = pdi.xyz.x / 128.0f + 0.5f;
+//  ret.color.g = pdi.xyz.y / 128.0f + 0.5f;
+//  ret.color.b = (pdi.xyz.z+150.0f) / 128.0f + 0.5f;
+
+
+//  ret.color.rgb = (pdi.normal+float3(1.0f, 1.0f, 1.0f))/2.0f;
+
+//ret.color.rgb = eye;
+
+  float3 eyeRay = normalize(pdi.xyz-eye);
+//  ret.color.rgb = (eyeRay + float3(1.0f, 1.0f, 1.0f))/2.0f;
+
+  float3 rRay = reflect(eyeRay, pdi.normal);
+//  ret.color.rgb = (rRay + float3(1.0f, 1.0f, 1.0f))/2.0f;
+
+  if (pdi.xyz.x < 0.0f)
+	ret.color.rgb = tex2D(tred, float2(0.5f, 0.5f)).rgb;
+  else if (pdi.xyz.y < 0.0f)
+	ret.color.rgb = tex2D(tgreen, float2(0.5f, 0.5f)).rgb;
+  else
+	ret.color.rgb = tex2D(tblue, float2(0.5f, 0.5f)).rgb;
+
+
+  // compute intersection between ground billboard and reflected ray
+  // I = pdi.xyz + rRay*t // equation 1 of ray plane intersection system of 2 equations
+  // (I-A)*n = 0 // equation 2 of ray plane intersection system of 2 equations
+  // if no intersection, then no reflection, return color as usual
+  // if yes intersection, lookup ground billboard color at intersection point
+
+  return ret;
+
+}
+
