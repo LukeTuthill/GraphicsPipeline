@@ -9,7 +9,8 @@ public:
 	FrameBuffer *fb;
 	Scene();
 	void DBG();
-	void Scene::NewButton();
+	void NewButton();
+	void render();
 };
 
 extern Scene *scene;

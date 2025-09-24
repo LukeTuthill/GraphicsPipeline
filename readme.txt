@@ -1,4 +1,2 @@
-CS 334 HW 1
-I attempted the Pong game extra credit, it is in pong.cpp, with keypresses handled by the framebuffer, and scoring handled by the scene. Up/down arrow for left player, left/right arrow for right player.
-
-Change the choice variable in Scene::DBG to choose between pong (0), the name video (1), or saving the name to a file (2).
+CS 334 HW 2
+For the identity matrix, I implemented a constructor which takes any scalar and makes a scalar matrix, so it can be constructed by calling that with 1 as the argument. GRAPH.tiff and the .exe are saved in the main folder of the zip.

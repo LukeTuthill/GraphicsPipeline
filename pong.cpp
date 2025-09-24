@@ -1,9 +1,9 @@
+#define _USE_MATH_DEFINES
+#include <cmath>
+
 #include "pong.h"
 
 using namespace std;
-
-#define _USE_MATH_DEFINES
-#include <cmath>
 
 #define UP_1 0
 #define DOWN_1 1
@@ -27,10 +27,10 @@ PongGame::PongGame(FrameBuffer* fb) {
 }
 
 void PongGame::redraw() {
-	fb->Set(0xFF000000);
-	fb->DrawRectangle(20, pos1, 10, 60, 0xFFFFFFFF);
-	fb->DrawRectangle(fb->w - 30, pos2, 10, 60, 0xFFFFFFFF);
-	fb->DrawCircle((int)(ball_u + .5), (int)(ball_v + .5), 8, 0xFFFFFFFF);
+	fb->set(0xFF000000);
+	fb->draw_rectangle(20, pos1, 10, 60, 0xFFFFFFFF);
+	fb->draw_rectangle(fb->w - 30, pos2, 10, 60, 0xFFFFFFFF);
+	fb->draw_circle((int)(ball_u + .5), (int)(ball_v + .5), 8, 0xFFFFFFFF);
 	fb->redraw();
 }
 
@@ -102,18 +102,18 @@ int PongGame::game_loop() {
 		ball_angle = -ball_angle;
 	}
 	else if (ball_v >= fb->h - 8) {
-		ball_v = fb->h - 8;
+		ball_v = (float)fb->h - 8;
 		ball_angle = -ball_angle;
 	}
 
 	//Ball movement
 	if (ball_travel_dir) {
-		ball_u += (.5f * cos(ball_angle));
-		ball_v -= (.5f * sin(ball_angle));
+		ball_u += (.5f * cosf(ball_angle));
+		ball_v -= (.5f * sinf(ball_angle));
 	}
 	else {
-		ball_u -= (.5f * cos(ball_angle));
-		ball_v += (.5f * sin(ball_angle));
+		ball_u -= (.5f * cosf(ball_angle));
+		ball_v += (.5f * sinf(ball_angle));
 	}
 
 	redraw();

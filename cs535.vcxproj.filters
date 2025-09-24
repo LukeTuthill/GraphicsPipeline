@@ -5,12 +5,20 @@
     <ClCompile Include="gui.cxx" />
     <ClCompile Include="scene.cpp" />
     <ClCompile Include="pong.cpp" />
+    <ClCompile Include="V3.cpp" />
+    <ClCompile Include="M33.cpp" />
+    <ClCompile Include="ppc.cpp" />
+    <ClCompile Include="TM.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="framebuffer.h" />
     <ClInclude Include="gui.h" />
     <ClInclude Include="scene.h" />
     <ClInclude Include="pong.h" />
+    <ClInclude Include="v3.h" />
+    <ClInclude Include="m33.h" />
+    <ClInclude Include="ppc.h" />
+    <ClInclude Include="tm.h" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="CG">

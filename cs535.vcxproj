@@ -78,14 +78,22 @@
   <ItemGroup>
     <ClInclude Include="framebuffer.h" />
     <ClInclude Include="gui.h" />
+    <ClInclude Include="m33.h" />
     <ClInclude Include="pong.h" />
+    <ClInclude Include="ppc.h" />
     <ClInclude Include="scene.h" />
+    <ClInclude Include="tm.h" />
+    <ClInclude Include="v3.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="framebuffer.cpp" />
     <ClCompile Include="gui.cxx" />
+    <ClCompile Include="M33.cpp" />
     <ClCompile Include="pong.cpp" />
+    <ClCompile Include="ppc.cpp" />
     <ClCompile Include="scene.cpp" />
+    <ClCompile Include="TM.cpp" />
+    <ClCompile Include="V3.cpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include="CG\shaderOne.cg" />
