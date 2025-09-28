@@ -188,7 +188,7 @@ void TM::scale(float s) {
 	}
 }
 
-void TM::render_as_wireframe(PPC* ppc, FrameBuffer* fb) {
+void TM::render_as_wireframe(PPC* ppc, FrameBuffer* fb, bool is_lighted) {
 	for (int ti = 0; ti < num_tris; ti++) {
 		int v0 = tris[ti * 3 + 0];
 		int v1 = tris[ti * 3 + 1];
@@ -196,16 +196,82 @@ void TM::render_as_wireframe(PPC* ppc, FrameBuffer* fb) {
 		V3 V0 = verts[v0];
 		V3 V1 = verts[v1];
 		V3 V2 = verts[v2];
-		V3 C0 = colors[v0];
-		V3 C1 = colors[v1];
-		V3 C2 = colors[v2];
+		
+		V3 C0, C1, C2;
+		if (is_lighted && lighted_colors) {
+			C0 = lighted_colors[v0];
+			C1 = lighted_colors[v1];
+			C2 = lighted_colors[v2];
+		}
+		else {
+			C0 = colors[v0];
+			C1 = colors[v1];
+			C2 = colors[v2];
+		}
 
-		fb->draw_3d_segment(C0, C1, V0, V1, ppc);
-		fb->draw_3d_segment(C1, C2, V1, V2, ppc);
-		fb->draw_3d_segment(C2, C0, V2, V0, ppc);
+		fb->draw_3d_segment(V0, V1, C0, C1, ppc);
+		fb->draw_3d_segment(V1, V2, C1, C2, ppc);
+		fb->draw_3d_segment(V2, V0, C2, C0, ppc);
 	}
 }
 
+void TM::rasterize(PPC* ppc, FrameBuffer* fb, bool is_lighted) {
+	for (int ti = 0; ti < num_tris; ti++) {
+		int v0 = tris[ti * 3 + 0];
+		int v1 = tris[ti * 3 + 1];
+		int v2 = tris[ti * 3 + 2];
+		V3 V0 = verts[v0];
+		V3 V1 = verts[v1];
+		V3 V2 = verts[v2];
+
+		V3 C0, C1, C2;
+		if (is_lighted && lighted_colors) {
+			C0 = lighted_colors[v0];
+			C1 = lighted_colors[v1];
+			C2 = lighted_colors[v2];
+		}
+		else {
+			C0 = colors[v0];
+			C1 = colors[v1];
+			C2 = colors[v2];
+		}
+
+		fb->draw_3d_triangle(V0, V1, V2, C0, C1, C2, ppc);
+	}
+}
+
+void TM::light_directional(V3 ld, float ka) {
+	ld = ld.normalized();
+
+	if (!lighted_colors)
+		lighted_colors = new V3[num_verts];
+
+	for (int vi = 0; vi < num_verts; vi++) {
+		lighted_colors[vi] = colors[vi].lighted(normals[vi], ld, ka);
+	}
+}
+
+void TM::visualize_normals(float nl, PPC* ppc, FrameBuffer* fb) {
+
+	if (!normals)
+		return;
+
+	for (int vi = 0; vi < num_verts; vi++) {
+		fb->draw_3d_segment(verts[vi], verts[vi] + normals[vi].normalized() * nl, 
+			V3(1, 0, 0), V3(1, 0, 0), ppc);
+	}
+
+}
+
+void TM::light_point(V3 l, float ka) {
+	if (!lighted_colors)
+		lighted_colors = new V3[num_verts];
+	
+	for (int vi = 0; vi < num_verts; vi++) {
+		V3 ld = (l - verts[vi]).normalized();
+		lighted_colors[vi] = colors[vi].lighted(normals[vi], ld, ka);
+	}
+}
 
 // loading triangle mesh from a binary file, i.e., a .bin file from geometry folder
 void TM::load_bin(char *fname) {
@@ -223,16 +289,20 @@ void TM::load_bin(char *fname) {
 		return;
 	}
 	if (verts)
-		delete verts;
+		delete[] verts;
 	verts = new V3[num_verts];
 
 	ifs.read(&yn, 1); // cols 3 floats
 	if (colors)
-		delete colors;
+		delete[] colors;
 	colors = 0;
 	if (yn == 'y') {
 		colors = new V3[num_verts];
 	}
+	
+	if (lighted_colors)
+		delete[] lighted_colors;
+	lighted_colors = nullptr;
 
 	ifs.read(&yn, 1); // normals 3 floats
 	if (normals)

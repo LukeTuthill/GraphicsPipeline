@@ -192,3 +192,20 @@ void V3::set_as_color(unsigned int color) {
 	xyz[1] = (float)((color & 0x0000FF00) >> 8) / 255.0f;
 	xyz[2] = (float)((color & 0x00FF0000) >> 16) / 255.0f;
 }
+
+V3 V3::lighted(V3 n, V3 ld, float ka) {
+	float kd = n * ld;
+	kd = fmaxf(0.0f, kd);
+	
+	return *this * (ka + (1.0f - ka) * kd);
+}
+
+void V3::light(V3 n, V3 ld, float ka) {
+	*this = lighted(n, ld, ka);
+}
+
+V3 V3::reflected(V3 l) {
+	V3& n = *this;
+	V3 ln = n * (n * l);
+	return 2 * ln - l;
+}

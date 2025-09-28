@@ -24,12 +24,15 @@ Scene::Scene() {
 	fb->show();
 	fb->redraw();
 
+	ppc = new PPC(60.0f, w, h); 
+	point_light = new V3();
+
 	gui = new GUI();
 	gui->show();
 	gui->uiw->position(u0, v0 + fb->h + v0);
 }
 
-void Scene::render() {
+void Scene::render_cameras_as_frames() {
 	PPC* ppcs;
 	int num_ppcs = load_from_file(&ppcs, "cameras.bin");
 	if (num_ppcs < 1) {
@@ -57,7 +60,7 @@ void Scene::render() {
 			float t = (float)f / (float)frames_per_camera;
 
 			fb->set(0xFFFFFFFF);
-			tm.render_as_wireframe(&ppc_start.interpolate(&ppc_end, t), fb);
+			tm.render_as_wireframe(&ppc_start.interpolate(&ppc_end, t), fb, false);
 			fb->redraw();
 			
 			// Save frame to TIFF file
@@ -70,23 +73,60 @@ void Scene::render() {
 	}
 }
 
+void Scene::render() {
+	fb->clear();
+		
+	ppc->translate(V3(0.0f, 25.0f, 150.0f));
+
+	TM tm("geometry/teapot1K.bin");
+	tm.rasterize(ppc, fb, false);
+
+	fb->redraw();
+}
+
 void Scene::DBG() {
 	cerr << endl;
-	fb->set(0xFFFFFFFF);
-
-	{
+	/*{
 		TM tm("geometry/teapot1K.bin");
-
-		float hfov = 60.0f;
-
-		ppc_for_keyboard_control = new PPC(hfov, fb->w, fb->h);
-		PPC& ppc = *ppc_for_keyboard_control;
-
-		ppc.translate(V3(0.0f, 0.0f, 250.0f));
+		*point_light = tm.get_center() + V3(0.0f, 100.0f, 0.0f);
+		ppc->translate(V3(0.0f, 25.0f, 150.0f));
 
 		while (true) {
-			fb->set(0xFFFFFFFF);
-			tm.render_as_wireframe(&ppc, fb);
+			fb->clear();
+			tm.rotate_about_arbitrary_axis(tm.get_center(), V3(0.0f, 1.0f, 0.0f), 1.0f);
+			tm.light_point(*point_light, 0.4f);
+			tm.rasterize(ppc, fb, true);
+			fb->visualize_point_light(*point_light, ppc);
+			fb->redraw();
+			Fl::check();
+		}
+		return;
+	}*/
+	{
+		TM tm("geometry/teapot1K.bin");
+		*point_light = tm.get_center() + V3(50.0f, 0.0f, 0.0f);
+		ppc->translate(V3(0.0f, 25.0f, 150.0f));
+
+		while (true) {
+			fb->clear();
+			tm.light_point(*point_light, 0.4f);
+			tm.rasterize(ppc, fb, true);
+			fb->visualize_point_light(*point_light, ppc);
+			fb->redraw();
+			Fl::check();
+
+			*point_light = point_light->rotate_point(tm.get_center(), V3(0.0f, 1.0f, 0.0f), 1.0f);
+		}
+		return;
+	}
+
+	{	
+		ppc->translate(V3(0.0f, 25.0f, 150.0f));
+		TM tm("geometry/teapot1K.bin");
+
+		while (true) {
+			fb->clear();
+			tm.rasterize(ppc, fb, false);
 			fb->redraw();
 			Fl::check();
 		}
@@ -96,11 +136,10 @@ void Scene::DBG() {
 	{
 		// Cylinder test
 		float hfov = 60.0f;
-		ppc_for_keyboard_control = new PPC(hfov, fb->w, fb->h);
-		PPC& ppc = *ppc_for_keyboard_control;
+		ppc = new PPC(hfov, fb->w, fb->h);
 		TM tm(V3(0, 0, -250.0f), 50.0f, 100.0f, 100, 0xFF0000FF);
 		tm.rotate_about_arbitrary_axis(V3(0, 0, -250.0f), V3(1, 0, 0), 60.0f);
-		tm.render_as_wireframe(&ppc, fb);
+		tm.render_as_wireframe(ppc, fb, false);
 		fb->redraw();
 		return;
 	}
@@ -108,10 +147,7 @@ void Scene::DBG() {
 	{
 		//PPC visualization test
 		PPC ppc(60.0f, fb->w, fb->h);
-
-		ppc_for_keyboard_control = new PPC(60.0f, fb->w, fb->h);
-		PPC& ppc2 = *ppc_for_keyboard_control;
-
+		PPC ppc2(60.0f, fb->w, fb->h);
 		ppc.translate_forward(200.0f);
 		ppc.pan(-50.0f);
 		ppc.visualize(fb, &ppc2, 100.0f);
@@ -124,9 +160,8 @@ void Scene::DBG() {
 		// spin the teapot in place (about a vertical axis passing through its center)
 		float hfov = 60.0f;
 
-		ppc_for_keyboard_control = new PPC(hfov, fb->w, fb->h);
-		PPC& ppc = *ppc_for_keyboard_control;
-		ppc.translate(V3(0.0f, 0.0f, 250.0f));
+		ppc = new PPC(hfov, fb->w, fb->h);
+		ppc->translate(V3(0.0f, 0.0f, 250.0f));
 
 		TM tm("geometry/teapot1K.bin");
 		V3 ad(0.0f, -0.1f, 0.0f);
@@ -134,7 +169,7 @@ void Scene::DBG() {
 		for (int fi = 0; fi < 10000; fi++) {
 			fb->set(0xFFFFFFFF);
 			//tm.draw_points(0xFF000000, 3, &ppc, fb);
-			tm.render_as_wireframe(&ppc, fb);
+			tm.render_as_wireframe(ppc, fb, false);
 			fb->redraw();
 			Fl::check();
 			//tm.scale(.999f);

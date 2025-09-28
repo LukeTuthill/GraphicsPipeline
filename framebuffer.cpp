@@ -22,6 +22,8 @@ FrameBuffer::FrameBuffer(int u0, int v0, int _w, int _h) :
 	w = _w;
 	h = _h;
 	pix = new unsigned int[w*h];
+	zb = new float[w*h];
+	move_light = false;
 }
 
 void FrameBuffer::draw() {
@@ -55,11 +57,21 @@ int FrameBuffer::handle(int event) {
 void FrameBuffer::KeyboardHandle() {
 	int key = Fl::event_key();
 
-	if (!ppc_for_keyboard_control) return;
+	if (!scene->ppc) return;
 	float move_constant = 1.0f;
 	float rotation_constant = 2.0f;
 
 	switch (key) {
+	case 'l':
+	case 'L':
+		move_light = !move_light;
+		if (move_light) {
+			cerr << "Light movement enabled" << endl;
+		}
+		else {
+			cerr << "Camera movement enabled" << endl;
+		}
+		break;
 	case 'b':
 	case 'B':
 		cerr << "Running camera path from cameras.bin" << endl;
@@ -68,13 +80,13 @@ void FrameBuffer::KeyboardHandle() {
 
 	case 'u':
 	case 'U':
-		cerr << "INFO: pressed u key, saving current framebuffer to out.tiff" << endl;
+		cerr << "Saving current framebuffer to out.tiff" << endl;
 		save_as_tiff((char*)"out.tiff");
 		return;
 	case 'p':
 	case 'P':
-		cerr << "INFO: pressed P key, saving current PPC to ppc vector" << endl;
-		ppc_for_keyboard_control->save_to_file_vector();
+		cerr << "Saving current PPC to ppc vector" << endl;
+		scene->ppc->save_to_file_vector();
 		break;
 	case 'o':
 	case 'O':
@@ -83,55 +95,79 @@ void FrameBuffer::KeyboardHandle() {
 		break;
 
 	case FL_Up:
-		ppc_for_keyboard_control->translate_forward(move_constant);
+		if (move_light) {
+            *(scene->point_light) = *(scene->point_light) + V3(0.0f, 0.0f, -move_constant);
+			break;
+		}
+		scene->ppc->translate_forward(move_constant);
 		break;
 	case FL_Down:
-		ppc_for_keyboard_control->translate_forward(-move_constant);
+		if (move_light) {
+            *(scene->point_light) = *(scene->point_light) + V3(0.0f, 0.0f, move_constant);
+			break;
+		}
+		scene->ppc->translate_forward(-move_constant);
 		break;
 	case FL_Left:
-		ppc_for_keyboard_control->translate_right(-move_constant);
+		if (move_light) {
+            *(scene->point_light) = *(scene->point_light) + V3(-move_constant, 0.0f, 0.0f);
+			break;
+		}
+		scene->ppc->translate_right(-move_constant);
 		break;
 	case FL_Right:
-		ppc_for_keyboard_control->translate_right(move_constant);
+		if (move_light) {
+            *(scene->point_light) = *(scene->point_light) + V3(move_constant, 0.0f, 0.0f);
+			break;
+		}
+		scene->ppc->translate_right(move_constant);
 		break;
-	case FL_Page_Up:
-		ppc_for_keyboard_control->translate_up(move_constant);
+	case '/':
+		if (move_light) {
+            *(scene->point_light) = *(scene->point_light) + V3(0.0f, move_constant, 0.0f);
+			break;
+		}
+		scene->ppc->translate_up(move_constant);
 		break;
-	case FL_Page_Down:
-		ppc_for_keyboard_control->translate_up(-move_constant);
+	case '.':
+		if (move_light) {
+            *(scene->point_light) = *(scene->point_light) + V3(0.0f, -move_constant, 0.0f);
+			break;
+		}
+		scene->ppc->translate_up(-move_constant);
 		break;
 
 	case 'w':
 	case 'W':
-		ppc_for_keyboard_control->tilt(rotation_constant);
+		scene->ppc->tilt(rotation_constant);
 		break;
 	case 's':
 	case 'S':
-		ppc_for_keyboard_control->tilt(-rotation_constant);
+		scene->ppc->tilt(-rotation_constant);
 		break;
 	case 'a':
 	case 'A':
-		ppc_for_keyboard_control->pan(-rotation_constant);
+		scene->ppc->pan(-rotation_constant);
 		break;
 	case 'd':
 	case 'D':
-		ppc_for_keyboard_control->pan(rotation_constant);
+		scene->ppc->pan(rotation_constant);
 		break;
 	case 'r':
 	case 'R':
-		ppc_for_keyboard_control->roll(-rotation_constant);
+		scene->ppc->roll(-rotation_constant);
 		break;
 	case 'f':
 	case 'F':
-		ppc_for_keyboard_control->roll(rotation_constant);
+		scene->ppc->roll(rotation_constant);
 		break;
 	case 't':
 	case 'T':
-		ppc_for_keyboard_control->zoom(rotation_constant);
+		scene->ppc->zoom(rotation_constant);
 		break;
 	case 'g':
 	case 'G':
-		ppc_for_keyboard_control->zoom(-rotation_constant);
+		scene->ppc->zoom(-rotation_constant);
 		break;
 	}
 
@@ -218,11 +254,22 @@ void FrameBuffer::save_as_tiff(char *fname) {
 	TIFFClose(out);
 }
 
-
+void FrameBuffer::clear() {
+	for (int uv = 0; uv < w * h; uv++) {
+		pix[uv] = 0xFFFFFFFF;
+		zb[uv] = 0.0f;
+	}
+}
 
 void FrameBuffer::set(unsigned int color) {
 	for (int uv = 0; uv < w*h; uv++)
 		pix[uv] = color;
+}
+
+void FrameBuffer::set_zb(float z) {
+	for (int uv = 0; uv < w * h; uv++) {
+		zb[uv] = z;
+	}
 }
 
 
@@ -230,11 +277,39 @@ void FrameBuffer::set(int u, int v, unsigned int color) {
 	pix[(h - 1 - v) * w + u] = color;
 }
 
+void FrameBuffer::set_zb(int u, int v, float z) {
+	zb[(h - 1 - v) * w + u] = z;
+}
+
 void FrameBuffer::set_safe(int u, int v, unsigned int color) {
 	if (u < 0 || u > w - 1 || v < 0 || v > h - 1) return;
 	set(u, v, color);
 }
 
+void FrameBuffer::set_zb_safe(int u, int v, float z) {
+	if (u < 0 || u > w - 1 || v < 0 || v > h - 1) return;
+	set_zb(u, v, z);
+}
+
+void FrameBuffer::set_with_zb(int u, int v, unsigned int color, float z) {
+	if (is_farther(u, v, z)) return;
+	set(u, v, color);
+	set_zb(u, v, z);
+}
+
+void FrameBuffer::set_with_zb_safe(int u, int v, unsigned int color, float z) {
+	if (u < 0 || u > w - 1 || v < 0 || v > h - 1) return;
+	set_with_zb(u, v, color, z);
+}
+
+bool FrameBuffer::is_farther(int u, int v, float z) {
+	return zb[(h - 1 - v) * w + u] > z;
+}
+
+bool FrameBuffer::is_farther_safe(int u, int v, float z) {
+	if (u < 0 || u > w - 1 || v < 0 || v > h - 1) return false;
+	return is_farther(u, v, z);
+}
 
 void FrameBuffer::draw_rectangle(int u, int v, int width, int height, unsigned int color) {
 	if (u < 0 || u + width > w - 1 || 
@@ -312,43 +387,13 @@ void FrameBuffer::draw_circle(int u, int v, int radius, unsigned int color) {
 	}
 }
 
-void FrameBuffer::draw_triangle(int u1, int v1, int u2, int v2, int u3, int v3, unsigned int color) {
-	//Sorts points by u value
-	if (u1 > u2) {
-		swap(u1, u2);
-		swap(v1, v2);
-	}
-	if (u3 > u1) {
-		swap(u3, u1);
-		swap(v3, v1);
-	}
-	if (u2 > u3) {
-		swap(u3, u2);
-		swap(v3, v2);
-	}
-
-	double slope1 = (double)(v2 - v1) / (double)(u2 - u1);
-	double slope2 = (double)(v3 - v1) / (double)(u3 - u1);
-
-	for (int uc = u1; uc <= u3; uc++) {
-		int v_start = (int)(v1 + slope1 * (uc - u1) + .5);
-		int v_end = (int)(v1 + slope2 * (uc - u1) + .5);
-		if (v_start > v_end) {
-			swap(v_start, v_end);
-		}
-		for (int vc = v_start; vc <= v_end; vc++) {
-			set(uc, vc, color);
-		}
-	}
-}
-
 void FrameBuffer::draw_2d_point(V3 P, int psize, unsigned int color) {
 	int up = (int)P[0];
 	int vp = (int)P[1];
 
 	for (int u = up - psize / 2; u < up + psize / 2; u++) {
 		for (int v = vp - psize / 2; v < vp + psize / 2; v++) {
-			set_safe(u, v, color);
+			set_with_zb_safe(u, v, color, P[2]);
 		}
 	}
 }
@@ -363,27 +408,119 @@ void FrameBuffer::draw_3d_point(V3 P, PPC *ppc, int psize,
 	draw_2d_point(PP, psize, color);
 }
 
-void FrameBuffer::draw_3d_segment(V3 C0, V3 C1, V3 V0, V3 V1, PPC* ppc) {
+void FrameBuffer::visualize_point_light(V3 l, PPC* ppc) {
+	draw_3d_point(l, ppc, 7, 0xFFFF0000);
+}
+
+void FrameBuffer::draw_3d_segment(V3 V0, V3 V1, V3 C0, V3 C1, PPC* ppc) {
 	V3 PV0, PV1;
 	if (!ppc->project(V0, PV0)) return;
 	if (!ppc->project(V1, PV1)) return;
-	PV0[2] = 0.0f;
-	PV1[2] = 0.0f;
-	draw_2d_segment(C0, C1, PV0, PV1, ppc);
+	draw_2d_segment(PV0, PV1, C0, C1);
 }
 
-void FrameBuffer::draw_2d_segment(V3 C0, V3 C1, V3 PV0, V3 PV1, PPC* ppc) {
-	int pixn = (int)((PV1 - PV0).length() + 2);
-	V3 curr_p = PV0;
-	V3 p_diff = (PV1 - PV0) / (float)(pixn - 1);
+void FrameBuffer::draw_2d_segment(V3 V0, V3 V1, V3 C0, V3 C1) {
+	int pixn = (int)((V1 - V0).length() + 2);
+	V3 curr_p = V0;
+	V3 p_diff = (V1 - V0) / (float)(pixn - 1);
 
 	V3 curr_c = C0;
 	V3 color_diff = (C1 - C0) / (float)(pixn - 1);
+
 	for (int si = 0; si < pixn; si++) {
 		unsigned int color = curr_c.convert_to_color_int();
-		set_safe((int)curr_p[0], (int)curr_p[1], color);
+		set_with_zb_safe((int)curr_p[0], (int)curr_p[1], color, curr_p[2]);
 
 		curr_p += p_diff;
 		curr_c += color_diff;
 	}
+}
+
+void FrameBuffer::draw_3d_triangle(V3 V0, V3 V1, V3 V2, V3 C0, V3 C1, V3 C2, PPC* ppc) {
+	V3 PV0, PV1, PV2;
+	if (!ppc->project(V0, PV0)) return;
+	if (!ppc->project(V1, PV1)) return;
+	if (!ppc->project(V2, PV2)) return;
+
+	draw_2d_triangle(PV0, PV1, PV2, C0, C1, C2);
+}
+
+void FrameBuffer::draw_2d_triangle(V3 V0, V3 V1, V3 V2, V3 C0, V3 C1, V3 C2) {
+	float a[3], b[3], c[3];
+	//0 to 1
+	a[0] = V1[1] - V0[1]; 
+	b[0] = -V1[0] + V0[0];
+	c[0] = -V1[1] * V0[0] + V0[1] * V1[0];
+
+	//1 to 2
+	a[1] = V2[1] - V1[1];
+	b[1] = -V2[0] + V1[0];
+	c[1] = -V2[1] * V1[0] + V1[1] * V2[0];
+
+	//2 to 0
+	a[2] = V0[1] - V2[1];
+	b[2] = -V0[0] + V2[0];
+	c[2] = -V0[1] * V2[0] + V2[1] * V0[0];
+
+	float sidedness = a[0] * V2[0] + b[0] * V2[1] + c[0];
+	if (sidedness < 0) {
+		a[0] *= -1;
+		b[0] *= -1;
+		c[0] *= -1;
+	}
+
+	sidedness = a[1] * V0[0] + b[1] * V0[1] + c[1];
+	if (sidedness < 0) {
+		a[1] *= -1;
+		b[1] *= -1;
+		c[1] *= -1;
+	}
+
+	sidedness = a[2] * V1[0] + b[2] * V1[1] + c[2];
+	if (sidedness < 0) {
+		a[2] *= -1;
+		b[2] *= -1;
+		c[2] *= -1;
+	}
+
+	float umin = fmax(0.0f, fmin(fmin(V0[0], V1[0]), V2[0]));
+	float umax = fmin((float)(w - 1), fmax(fmax(V0[0], V1[0]), V2[0]));
+	float vmin = fmax(0.0f, fmin(fmin(V0[1], V1[1]), V2[1]));
+	float vmax = fmin((float)(h - 1), fmax(fmax(V0[1], V1[1]), V2[1]));
+
+	int left = (int)(umin + .5f);
+	int right = (int)(umax - .5f);
+	int top = (int)(vmin + .5f);
+	int bottom = (int)(vmax - .5f);
+
+	float currEELS[3], currEE[3];
+	
+	currEELS[0] = a[0] * (left + .5f) + b[0] * (top + .5f) + c[0];
+	currEELS[1] = a[1] * (left + .5f) + b[1] * (top + .5f) + c[1];
+	currEELS[2] = a[2] * (left + .5f) + b[2] * (top + .5f) + c[2];
+	
+	for (int v = top; v <= bottom; v++) {
+		currEE[0] = currEELS[0];
+		currEE[1] = currEELS[1];
+		currEE[2] = currEELS[2];
+		
+		for (int u = left; u <= right; u++) {
+			if (currEE[0] >= 0 && currEE[1] >= 0 && currEE[2] >= 0) {
+				float area = a[0] * V2[0] + b[0] * V2[1] + c[0];
+				float alpha = (a[1] * u + b[1] * v + c[1]) / area;
+				float beta = (a[2] * u + b[2] * v + c[2]) / area;
+				float gamma = 1.0f - alpha - beta;
+				float curr_z = alpha * V0[2] + beta * V1[2] + gamma * V2[2];
+				V3 color_vector = alpha * C0 + beta * C1 + gamma * C2;
+				set_with_zb(u, v, color_vector.convert_to_color_int(), curr_z);
+			}
+			currEE[0] += a[0];
+			currEE[1] += a[1];
+			currEE[2] += a[2];
+		}
+		currEELS[0] += b[0];
+		currEELS[1] += b[1];
+		currEELS[2] += b[2];
+	}
+
 }

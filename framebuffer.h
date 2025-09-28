@@ -11,8 +11,10 @@ class PPC;
 
 class FrameBuffer : public Fl_Gl_Window {
 public:
-	unsigned int *pix;
+	unsigned int* pix;
+	float* zb;
 	int w, h;
+	bool move_light;
 	FrameBuffer(int u0, int v0, int _w, int _h);
 	void draw();
 	int handle(int guievent);
@@ -20,17 +22,34 @@ public:
 	void save_as_tiff(char* fname);
 	void KeyboardHandle();
 
+	void clear();
 	void set(unsigned int color);
+	void set_zb(float z);
+
 	void set(int u, int v, unsigned int color);
+	void set_zb(int u, int v, float z);
+
 	void set_safe(int u, int v, unsigned int color);
+	void set_zb_safe(int u, int v, float z);
+
+	void set_with_zb(int u, int v, unsigned int color, float z);
+	void set_with_zb_safe(int u, int v, unsigned int color, float z);
+
+	bool is_farther(int u, int v, float z);
+	bool is_farther_safe(int u, int v, float z);
 
 	void draw_rectangle(int u, int v, int width, int height, unsigned int color);
 	void draw_circle(int u, int v, int radius, unsigned int color);
 	void draw_line(int u1, int v1, int u2, int v2, unsigned int color);
 	void draw_line_safe(int u1, int v1, int u2, int v2, unsigned int color);
-	void draw_triangle(int u1, int v1, int u2, int v2, int u3, int v3, unsigned int color);
+
 	void draw_2d_point(V3 p, int psize, unsigned int color);
 	void draw_3d_point(V3 p, PPC* ppc, int psize, unsigned int color);
-	void draw_3d_segment(V3 C0, V3 C1, V3 V0, V3 V1, PPC* ppc);
-	void draw_2d_segment(V3 C0, V3 C1, V3 V0, V3 V1, PPC* ppc);
+	void visualize_point_light(V3 l, PPC* ppc);
+
+	void draw_2d_segment(V3 V0, V3 V1, V3 C0, V3 C1);
+	void draw_3d_segment(V3 V0, V3 V1, V3 C0, V3 C1, PPC* ppc);
+
+	void draw_2d_triangle(V3 V0, V3 V1, V3 V2, V3 C0, V3 C1, V3 C2);
+	void draw_3d_triangle(V3 V0, V3 V1, V3 V2, V3 C0, V3 C1, V3 C2, PPC* ppc);
 };

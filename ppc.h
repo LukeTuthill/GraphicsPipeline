@@ -37,5 +37,4 @@ public:
 	void visualize(FrameBuffer* fb, PPC* ppc, float focal_length);
 };
 
-extern PPC* ppc_for_keyboard_control;
 extern std::vector<PPC> ppcs_to_save;
