@@ -26,6 +26,7 @@ Scene::Scene() {
 
 	ppc = new PPC(60.0f, w, h); 
 	point_light = new V3();
+	render_light = true;
 
 	gui = new GUI();
 	gui->show();
@@ -86,7 +87,7 @@ void Scene::render() {
 
 void Scene::DBG() {
 	cerr << endl;
-	/*{
+		/*{
 		TM tm("geometry/teapot1K.bin");
 		*point_light = tm.get_center() + V3(0.0f, 100.0f, 0.0f);
 		ppc->translate(V3(0.0f, 25.0f, 150.0f));
@@ -109,8 +110,8 @@ void Scene::DBG() {
 
 		while (true) {
 			fb->clear();
-			tm.light_point(*point_light, 0.4f);
-			tm.rasterize(ppc, fb, true);
+			tm.light_point(*point_light, ppc->C, 0.4f, 200);
+			tm.rasterize(ppc, fb, render_light);
 			fb->visualize_point_light(*point_light, ppc);
 			fb->redraw();
 			Fl::check();

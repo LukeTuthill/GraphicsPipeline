@@ -62,6 +62,16 @@ void FrameBuffer::KeyboardHandle() {
 	float rotation_constant = 2.0f;
 
 	switch (key) {
+	case 'k':
+	case 'K':
+		scene->render_light = !scene->render_light;
+		if (scene->render_light) {
+			cerr << "Rendering with light" << endl;
+		}
+		else {
+			cerr << "Rendering without light" << endl;
+		}
+		break;
 	case 'l':
 	case 'L':
 		move_light = !move_light;
@@ -499,6 +509,9 @@ void FrameBuffer::draw_2d_triangle(V3 V0, V3 V1, V3 V2, V3 C0, V3 C1, V3 C2) {
 	currEELS[1] = a[1] * (left + .5f) + b[1] * (top + .5f) + c[1];
 	currEELS[2] = a[2] * (left + .5f) + b[2] * (top + .5f) + c[2];
 	
+	//Computes twice signed area of the triangle using edge function V0-V1 and V2
+	float area = a[0] * V2[0] + b[0] * V2[1] + c[0]; 
+
 	for (int v = top; v <= bottom; v++) {
 		currEE[0] = currEELS[0];
 		currEE[1] = currEELS[1];
@@ -506,12 +519,16 @@ void FrameBuffer::draw_2d_triangle(V3 V0, V3 V1, V3 V2, V3 C0, V3 C1, V3 C2) {
 		
 		for (int u = left; u <= right; u++) {
 			if (currEE[0] >= 0 && currEE[1] >= 0 && currEE[2] >= 0) {
-				float area = a[0] * V2[0] + b[0] * V2[1] + c[0];
-				float alpha = (a[1] * u + b[1] * v + c[1]) / area;
-				float beta = (a[2] * u + b[2] * v + c[2]) / area;
-				float gamma = 1.0f - alpha - beta;
-				float curr_z = alpha * V0[2] + beta * V1[2] + gamma * V2[2];
-				V3 color_vector = alpha * C0 + beta * C1 + gamma * C2;
+
+				//Computes barycentric weights
+				float weight_0 = (a[1] * u + b[1] * v + c[1]) / area;
+				float weight_1 = (a[2] * u + b[2] * v + c[2]) / area;
+				float weight_2 = 1.0f - weight_0 - weight_1;
+
+				//Interpolates depth and color
+				float curr_z = weight_0 * V0[2] + weight_1 * V1[2] + weight_2 * V2[2];
+				V3 color_vector = weight_0 * C0 + weight_1 * C1 + weight_2 * C2;
+				
 				set_with_zb(u, v, color_vector.convert_to_color_int(), curr_z);
 			}
 			currEE[0] += a[0];

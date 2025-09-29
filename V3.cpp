@@ -1,5 +1,6 @@
 #define _USE_MATH_DEFINES
 #include <cmath>
+#include <iostream>
 
 #include "v3.h"
 #include "m33.h"
@@ -193,15 +194,20 @@ void V3::set_as_color(unsigned int color) {
 	xyz[2] = (float)((color & 0x00FF0000) >> 16) / 255.0f;
 }
 
-V3 V3::lighted(V3 n, V3 ld, float ka) {
+V3 V3::lighted(V3 n, V3 ld, V3 eye_pos, float ka, float phong_exp) {
+	//n and ld should already be normalized()
+
 	float kd = n * ld;
 	kd = fmaxf(0.0f, kd);
-	
-	return *this * (ka + (1.0f - ka) * kd);
+
+	V3 view_dir = (eye_pos - *this).normalized();
+	float ks = fmaxf(0.0f, pow(fmaxf(0.0f, n.reflected(ld) * view_dir), phong_exp));
+
+	return *this * (ka + (1.0f - ka) * kd + ks);
 }
 
-void V3::light(V3 n, V3 ld, float ka) {
-	*this = lighted(n, ld, ka);
+void V3::light(V3 n, V3 ld, V3 eye_pos, float ka, float phong_exp) {
+	*this = lighted(n, ld, eye_pos, ka, phong_exp);
 }
 
 V3 V3::reflected(V3 l) {

@@ -240,14 +240,14 @@ void TM::rasterize(PPC* ppc, FrameBuffer* fb, bool is_lighted) {
 	}
 }
 
-void TM::light_directional(V3 ld, float ka) {
+void TM::light_directional(V3 ld, V3 eye_pos, float ka, float phong_exp) {
 	ld = ld.normalized();
 
 	if (!lighted_colors)
 		lighted_colors = new V3[num_verts];
 
 	for (int vi = 0; vi < num_verts; vi++) {
-		lighted_colors[vi] = colors[vi].lighted(normals[vi], ld, ka);
+		lighted_colors[vi] = colors[vi].lighted(normals[vi], ld, eye_pos, ka, phong_exp);
 	}
 }
 
@@ -263,13 +263,14 @@ void TM::visualize_normals(float nl, PPC* ppc, FrameBuffer* fb) {
 
 }
 
-void TM::light_point(V3 l, float ka) {
+void TM::light_point(V3 l, V3 eye_pos, float ka, float phong_exp) {
 	if (!lighted_colors)
 		lighted_colors = new V3[num_verts];
 	
 	for (int vi = 0; vi < num_verts; vi++) {
 		V3 ld = (l - verts[vi]).normalized();
-		lighted_colors[vi] = colors[vi].lighted(normals[vi], ld, ka);
+		lighted_colors[vi] = 
+			colors[vi].lighted(normals[vi], ld, eye_pos, ka, phong_exp);
 	}
 }
 

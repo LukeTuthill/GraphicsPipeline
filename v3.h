@@ -40,8 +40,8 @@ public:
 	unsigned int convert_to_color_int();
 	void set_as_color(unsigned int color);
 
-	V3 lighted(V3 n, V3 ld, float ka);
-	void light(V3 n, V3 ld, float ka);
+	V3 lighted(V3 n, V3 ld, V3 eye_pos, float ka, float phong_exp);
+	void light(V3 n, V3 ld, V3 eye_pos, float ka, float phong_exp);
 
 	V3 reflected(V3 l);
 };

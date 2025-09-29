@@ -9,6 +9,8 @@ public:
 	FrameBuffer *fb;
 	PPC* ppc;
 	V3* point_light;
+	bool render_light;
+
 	Scene();
 	void DBG();
 	void NewButton();

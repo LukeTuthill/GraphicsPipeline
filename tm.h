@@ -41,6 +41,6 @@ public:
 
 	void visualize_normals(float nl, PPC* ppc, FrameBuffer* fb);
 
-	void light_directional(V3 ld, float ka);
-	void light_point(V3 l, float ka);
+	void light_directional(V3 ld, V3 eye_pos, float ka, float phong_exp);
+	void light_point(V3 l, V3 eye_pos, float ka, float phong_exp);
 };
