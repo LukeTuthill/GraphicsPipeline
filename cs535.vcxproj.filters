@@ -9,6 +9,7 @@
     <ClCompile Include="M33.cpp" />
     <ClCompile Include="ppc.cpp" />
     <ClCompile Include="TM.cpp" />
+    <ClCompile Include="shadow_map.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="framebuffer.h" />
@@ -19,6 +20,7 @@
     <ClInclude Include="m33.h" />
     <ClInclude Include="ppc.h" />
     <ClInclude Include="tm.h" />
+    <ClInclude Include="shadow_map.h" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="CG">

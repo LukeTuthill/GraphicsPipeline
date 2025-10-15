@@ -1,9 +1,6 @@
 #include "GL/glew.h"
 #include "scene.h"
-#include "pong.h"
 #include "m33.h"
-#include "ppc.h"
-#include "tm.h"
 
 Scene *scene;
 
@@ -25,8 +22,25 @@ Scene::Scene() {
 	fb->redraw();
 
 	ppc = new PPC(60.0f, w, h); 
-	point_light = new V3();
 	render_light = true;
+	ambient_factor = .4f;
+	specular_exp = 200;
+
+	num_tms = 3;
+	tms = new TM[num_tms];
+	tms[0] = TM("geometry/teapot57K.bin");
+	tms[1] = TM("geometry/teapot57K.bin");
+	tms[1].translate(V3(75.0f, 25.0f, 0.0f));
+	tms[1].scale(0.5f);
+	//tms[1] = TM(V3(-100.0f, 0.0f, -100.0f), V3(100.0f, 0.0f, 100.0f), 0xFFFF00FF);
+	//tms[1].rotate_about_arbitrary_axis(tms[1].get_center(), V3(0.0f, 0.0f, 1.0f), 90.0f);
+	//tms[1].translate(V3(50.0f, 50.0f, 0.0f));
+	tms[2] = TM(V3(-100.0f, 0.0f, -100.0f), V3(100.0f, 0.0f, 100.0f), 0xFF888888);
+
+	shadow_map = new ShadowMap(512, 512, V3());
+	point_light = new V3();
+
+	pong_game = nullptr;
 
 	gui = new GUI();
 	gui->show();
@@ -60,8 +74,8 @@ void Scene::render_cameras_as_frames() {
 		for (int f = 0; f < frames_per_camera; f++) {
 			float t = (float)f / (float)frames_per_camera;
 
-			fb->set(0xFFFFFFFF);
-			tm.render_as_wireframe(&ppc_start.interpolate(&ppc_end, t), fb, false);
+			fb->clear();
+			tm.rasterize(&ppc_start.interpolate(&ppc_end, t), fb, false);
 			fb->redraw();
 			
 			// Save frame to TIFF file
@@ -74,79 +88,86 @@ void Scene::render_cameras_as_frames() {
 	}
 }
 
+void Scene::render_shadows() {
+	shadow_map->clear();
+	for (int i = 0; i < num_tms; i++) {
+		shadow_map->add_tm(&tms[i]);
+	}
+}
+
 void Scene::render() {
 	fb->clear();
-		
-	ppc->translate(V3(0.0f, 25.0f, 150.0f));
 
-	TM tm("geometry/teapot1K.bin");
-	tm.rasterize(ppc, fb, false);
+	for (int i = 0; i < num_tms; i++) {
+		render(tms[i]);
+	}
+
+	if (render_light)
+		fb->visualize_point_light(*point_light, ppc);
 
 	fb->redraw();
+	Fl::check();
+}
+
+void Scene::render(TM& tm) {
+	if (render_light)
+		tm.light_point(shadow_map, ppc->C, ambient_factor, specular_exp);
+	tm.rasterize(ppc, fb, render_light);
 }
 
 void Scene::DBG() {
 	cerr << endl;
-		/*{
-		TM tm("geometry/teapot1K.bin");
-		*point_light = tm.get_center() + V3(0.0f, 100.0f, 0.0f);
-		ppc->translate(V3(0.0f, 25.0f, 150.0f));
-
+	int choice = 3;
+	
+	switch (choice) {
+	case 3: { //Moving triangle mesh with lighting
+		ppc->translate(V3(0.0f, 50.0f, 250.0f));
+		*point_light = tms[0].get_center() + V3(0.0f, 50.0f, 150.0f);
+		*point_light = point_light->rotate_point(tms[0].get_center(), V3(0.0f, 1.0f, 0.0f), 90.0f);
+		shadow_map->set_pos(*point_light);
+		
 		while (true) {
-			fb->clear();
-			tm.rotate_about_arbitrary_axis(tm.get_center(), V3(0.0f, 1.0f, 0.0f), 1.0f);
-			tm.light_point(*point_light, 0.4f);
-			tm.rasterize(ppc, fb, true);
-			fb->visualize_point_light(*point_light, ppc);
-			fb->redraw();
-			Fl::check();
-		}
-		return;
-	}*/
-	{
-		TM tm("geometry/teapot1K.bin");
-		*point_light = tm.get_center() + V3(50.0f, 0.0f, 0.0f);
-		ppc->translate(V3(0.0f, 25.0f, 150.0f));
-
-		while (true) {
-			fb->clear();
-			tm.light_point(*point_light, ppc->C, 0.4f, 200);
-			tm.rasterize(ppc, fb, render_light);
-			fb->visualize_point_light(*point_light, ppc);
-			fb->redraw();
-			Fl::check();
-
-			*point_light = point_light->rotate_point(tm.get_center(), V3(0.0f, 1.0f, 0.0f), 1.0f);
+			tms[1].rotate_about_arbitrary_axis(tms[0].get_center(), V3(0.0f, 1.0f, 0.0f), 1.0f);
+			shadow_map->set_pos(*point_light);
+			render_shadows();
+			render();
 		}
 		return;
 	}
-
-	{	
-		ppc->translate(V3(0.0f, 25.0f, 150.0f));
-		TM tm("geometry/teapot1K.bin");
-
+	case 2: { //Moving point light with shadows
+		ppc->translate(V3(0.0f, 50.0f, 250.0f));
+		*point_light = tms[0].get_center() + V3(0.0f, 50.0f, 150.0f);
+		shadow_map->set_pos(*point_light);
+		
 		while (true) {
-			fb->clear();
-			tm.rasterize(ppc, fb, false);
-			fb->redraw();
-			Fl::check();
+			shadow_map->set_pos(*point_light);
+			render_shadows();
+			render();
 		}
 		return;
 	}
+	case 1: { //Static render with lighting, loop allows camera movement
+		ppc->translate(V3(0.0f, 50.0f, 300.0f));
+		*point_light = tms[0].get_center() + V3(0.0f, 50.0f, 150.0f);
+		*point_light = point_light->rotate_point(tms[0].get_center(), V3(0.0f, 1.0f, 0.0f), 90.0f);
 
-	{
-		// Cylinder test
-		float hfov = 60.0f;
-		ppc = new PPC(hfov, fb->w, fb->h);
-		TM tm(V3(0, 0, -250.0f), 50.0f, 100.0f, 100, 0xFF0000FF);
-		tm.rotate_about_arbitrary_axis(V3(0, 0, -250.0f), V3(1, 0, 0), 60.0f);
-		tm.render_as_wireframe(ppc, fb, false);
-		fb->redraw();
+		render_light = true;
+		while (true) {
+			shadow_map->set_pos(*point_light);
+			render_shadows();
+			render();
+		}
 		return;
 	}
-
-	{
-		//PPC visualization test
+	case 0: { //Static render, loop allows camera movement
+		ppc->translate(V3(0.0f, 0.0f, 300.0f));
+		render_light = false;
+		while (true) {
+			render();
+		}
+		return;
+	}
+	case -1: { //PPC visualization test
 		PPC ppc(60.0f, fb->w, fb->h);
 		PPC ppc2(60.0f, fb->w, fb->h);
 		ppc.translate_forward(200.0f);
@@ -155,87 +176,22 @@ void Scene::DBG() {
 		fb->redraw();
 		return;
 	}
+	case -2: { //Pong Game
+		pong_game = new PongGame(fb);
+		pong = true;
 
-	
-	{
-		// spin the teapot in place (about a vertical axis passing through its center)
-		float hfov = 60.0f;
-
-		ppc = new PPC(hfov, fb->w, fb->h);
-		ppc->translate(V3(0.0f, 0.0f, 250.0f));
-
-		TM tm("geometry/teapot1K.bin");
-		V3 ad(0.0f, -0.1f, 0.0f);
-		V3 aO = tm.get_center();
-		for (int fi = 0; fi < 10000; fi++) {
-			fb->set(0xFFFFFFFF);
-			//tm.draw_points(0xFF000000, 3, &ppc, fb);
-			tm.render_as_wireframe(ppc, fb, false);
-			fb->redraw();
-			Fl::check();
-			//tm.scale(.999f);
-			//tm.rotate_about_arbitrary_axis(aO, ad, 0.05f);
-			/*ppc.zoom(0.5f);
-			ppc.pan(0.01f);
-			ppc.translate_right(-.1f);*/
-			//tm.translate(ad);
-		}
-
-		return;
-	}
-
-	fb->set(0xFFFFFFFF);
-
-	//Rotation about an arbitrary axis test
-
-	fb->draw_line(0, 100, 360, 100, 0xFF000000); //x axis
-	fb->draw_line(180, 0, 180, 200, 0xFF000000); //y axis
-
-	V3 axis(1, 7, 4);
-	V3 Oa(5, 2, 0);
-	V3 p(1, 100, 12);
-
-	for (int i = 0; i <= 360; i += 2) {
-		V3 p_rotated = p.rotate_point(Oa, axis, (float)i);
-		fb->set_safe(i, 100 + (int)p_rotated[0], 0xFF00FF00); //green
-		fb->set_safe(i, 100 + (int)p_rotated[1], 0xFFFF0000); //blue
-		fb->set_safe(i, 100 + (int)p_rotated[2], 0xFF0000FF); //red
-	}
-
-	fb->redraw();
-
-	fb->save_as_tiff("GRAPH.tiff");
-
-	return;
-
-	M33 m(V3(2, 5, 2), V3(8, 4, 2), V3(1, 2, 2));
-	cout << m << endl;
-	M33 m2 = m.inverted();
-
-	cout << m2 << endl;
-
-	cout << m * m2 << endl;
-
-	return;
-
-	int choice = 0;
-
-	if (choice == 0) {
-		//Pong Game
-		PongGame::pong_game = new PongGame(fb);
 		int score1 = 0;
 		int score2 = 0;
 
 		//Game Loop
 		while (true) {
-			int result = PongGame::pong_game->game_loop();
+			int result = pong_game->game_loop();
 			Fl::check();
 
 			//Resetting game if someone scored
 			if (result != 0) {
-				PongGame::pong_game = nullptr;
-				delete PongGame::pong_game;
-				PongGame::pong_game = new PongGame(fb);
+				delete pong_game;
+				pong_game = new PongGame(fb);
 				if (result == 1) {
 					cerr << "Player 1 scores!" << endl;
 					score1++;
@@ -247,32 +203,9 @@ void Scene::DBG() {
 				cerr << "Score: " << score1 << " - " << score2 << endl;
 			}
 		}
-
 		return;
 	}
-	else if (choice == 1) {
-		fb->set(0xFFFFFFFF);
-
-		//Name scrolling video
-		for (int u = 0; u < 10000; u++) {
-			fb->set(0xFFFFFFFF);
-			WriteName(u, fb);
-			fb->redraw();
-			Fl::check();
-		}
-		return;
 	}
-	else if (choice == 2) {
-		//Writing name and saving to tiff file
-		WriteName(50, fb);
-
-		fb->redraw();
-		fb->save_as_tiff("name.tiff");
-		return;
-	}
-
-	cerr << endl;
-	cerr << "INFO: pressed DBG button on GUI" << endl;
 }
 
 void Scene::NewButton() {

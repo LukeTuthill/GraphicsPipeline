@@ -1,21 +1,17 @@
 #include <GL/glew.h>
-#include "framebuffer.h"
-#include "math.h"
-#include "scene.h"
-#include "pong.h"
-#include "ppc.h"
-
 #include <tiffio.h>
-
-using namespace std;
-
-#define _USE_MATH_DEFINES
+#include <FL/fl_ask.h>
 
 #include <iostream>
 #include <fstream>
 #include <strstream>
-#include <cmath>
 
+#include "framebuffer.h"
+#include "scene.h"
+#include "pong.h"
+#include "ppc.h"
+
+using namespace std;
 
 FrameBuffer::FrameBuffer(int u0, int v0, int _w, int _h) : 
 	Fl_Gl_Window(u0, v0, _w, _h, 0) {
@@ -61,7 +57,51 @@ void FrameBuffer::KeyboardHandle() {
 	float move_constant = 1.0f;
 	float rotation_constant = 2.0f;
 
+	if (scene->pong) {
+		switch (key) {
+		case FL_Up: {
+			scene->pong_game->move_p1_up();
+			break;
+		}
+		case FL_Down: {
+			scene->pong_game->move_p1_down();
+			break;
+		}
+		case FL_Left: {
+			scene->pong_game->move_p2_up();
+			break;
+		}
+		case FL_Right: {
+			scene->pong_game->move_p2_down();
+			break;
+		}
+		default:
+			cerr << "INFO: do not understand keypress" << endl;
+			return;
+		}
+;
+	}
+
 	switch (key) {
+	case '1': {
+		const char* val = fl_input("New Ambient Factor (0.0-1.0)", "0.4");
+		if (val) {
+			scene->ambient_factor = (float)atof(val);
+			scene->ambient_factor = fminf(fmaxf(0.0f, scene->ambient_factor), 1.0f);
+			cerr << "Ambient factor is now " << scene->ambient_factor << endl;
+		}
+		break;
+	}
+	case '2': {
+		const char* val = fl_input("New Specular Exponent (>0)", "200");
+		if (val) {
+			scene->specular_exp = atoi(val);
+			scene->specular_exp = max(0, scene->specular_exp);
+			cerr << "Specular exponent is now " << scene->specular_exp << endl;
+		}
+		break;
+	}
+
 	case 'k':
 	case 'K':
 		scene->render_light = !scene->render_light;
@@ -182,32 +222,7 @@ void FrameBuffer::KeyboardHandle() {
 	}
 
 	/* Pong handler
-	switch (key) {
-	case FL_Up: {
-		if (!PongGame::pong_game) break;
-		PongGame::pong_game->move_p1_up();
-		break;
-	}
-	case FL_Down: {
-		if (!PongGame::pong_game) break;
-		PongGame::pong_game->move_p1_down();
-		break;
-	}
-	case FL_Left: {
-		if (!PongGame::pong_game) break;
-		PongGame::pong_game->move_p2_up();
-		break;
-	}
-	case FL_Right: {
-		if (!PongGame::pong_game) break;
-		PongGame::pong_game->move_p2_down();
-		break;
-	}
-	default:
-		cerr << "INFO: do not understand keypress" << endl;
-		return;
-	}
-	*/
+		*/
 }
 
 // load a tiff image to pixel buffer

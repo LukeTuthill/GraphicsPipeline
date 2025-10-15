@@ -2,6 +2,7 @@
 #include <cmath>
 
 #include "ppc.h"
+#include "framebuffer.h"
 
 #include <fstream>
 
@@ -38,8 +39,10 @@ int PPC::project(V3 P, V3& PP) {
 
 	V3 q = m_inverted*(P - C);
 
-	if (q[2] <= 0.0f)
+	if (q[2] <= 0.0f) {
+		PP = V3(FLT_MAX, 0, 0);
 		return 0;
+	}
 
 	PP[0] = q[0] / q[2];
 	PP[1] = q[1] / q[2];

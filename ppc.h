@@ -2,7 +2,6 @@
 
 #include "v3.h"
 #include "m33.h"
-#include "framebuffer.h"
 #include <vector>
 
 class FrameBuffer;

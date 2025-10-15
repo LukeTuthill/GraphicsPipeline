@@ -27,7 +27,5 @@ public:
 	void move_p2_down();
 
 	int game_loop();
-
-	static PongGame* pong_game;
 };
 

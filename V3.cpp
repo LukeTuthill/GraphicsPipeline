@@ -194,20 +194,20 @@ void V3::set_as_color(unsigned int color) {
 	xyz[2] = (float)((color & 0x00FF0000) >> 16) / 255.0f;
 }
 
-V3 V3::lighted(V3 n, V3 ld, V3 eye_pos, float ka, float phong_exp) {
-	//n and ld should already be normalized()
+V3 V3::lighted(V3 n, V3 ld, V3 view_dir, float ka, int specular_exp) {
+	//n should already be normal
+	ld = ld.normalized();
+	view_dir = view_dir.normalized();
 
 	float kd = n * ld;
 	kd = fmaxf(0.0f, kd);
 
-	V3 view_dir = (eye_pos - *this).normalized();
-	float ks = fmaxf(0.0f, pow(fmaxf(0.0f, n.reflected(ld) * view_dir), phong_exp));
-
+	float ks = fmaxf(0.0f, pow(fmaxf(0.0f, n.reflected(ld) * view_dir), (float)specular_exp));
 	return *this * (ka + (1.0f - ka) * kd + ks);
 }
 
-void V3::light(V3 n, V3 ld, V3 eye_pos, float ka, float phong_exp) {
-	*this = lighted(n, ld, eye_pos, ka, phong_exp);
+void V3::light(V3 n, V3 ld, V3 view_dir, float ka, int specular_exp) {
+	*this = lighted(n, ld, view_dir, ka, specular_exp);
 }
 
 V3 V3::reflected(V3 l) {

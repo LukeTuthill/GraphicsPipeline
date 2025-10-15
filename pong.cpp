@@ -119,5 +119,3 @@ int PongGame::game_loop() {
 	redraw();
 	return 0;
 }
-
-PongGame* PongGame::pong_game = nullptr;

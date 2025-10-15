@@ -3,10 +3,12 @@
 #include "v3.h"
 #include "framebuffer.h"
 #include "ppc.h"
+#include "shadow_map.h"
 
 class TM {
 public:
-	V3 *verts;
+	V3* verts;
+	V3* projected_verts;
 	int num_verts;
 
 	V3 *colors; // vertex colors in V3 format (one float in [0.0f, 1.0f] per R, G, and B channel)
@@ -22,6 +24,10 @@ public:
 
 	//Cylinder constructor
 	TM(V3 center, float radius, float height, int _num_verts, unsigned int color);
+
+	//Plane constructor
+	TM(V3 p1, V3 p2, unsigned int color);
+
 	void load_bin(char *fname); // load from file
 
 	void draw_points(unsigned int color, int psize, PPC *ppc,
@@ -31,6 +37,7 @@ public:
 	V3 get_center(); // return the average of all vertices
 
 	void set_as_box(V3 p1, V3 p2, unsigned int color); 
+	void set_as_plane(V3 p1, V3 p2, unsigned int color);
     void get_bounding_box(V3& p1, V3& p2); // return p1, p2 via reference
 	void translate(V3 tv);
 	void position(V3 new_center);
@@ -41,6 +48,10 @@ public:
 
 	void visualize_normals(float nl, PPC* ppc, FrameBuffer* fb);
 
-	void light_directional(V3 ld, V3 eye_pos, float ka, float phong_exp);
-	void light_point(V3 l, V3 eye_pos, float ka, float phong_exp);
+	void light_directional(ShadowMap* shadow_map, V3 eye_pos, float ka, int specular_exp);
+	void light_point(ShadowMap* shadow_map, V3 eye_pos, float ka, int specular_exp);
+
+private:
+    void create_face(V3 origin, V3 u_dir, V3 v_dir, int u_steps, int v_steps, V3 normal, 
+        const V3& color_vector, int& v_idx, int& t_idx);
 };

@@ -82,6 +82,7 @@
     <ClInclude Include="pong.h" />
     <ClInclude Include="ppc.h" />
     <ClInclude Include="scene.h" />
+    <ClInclude Include="shadow_map.h" />
     <ClInclude Include="tm.h" />
     <ClInclude Include="v3.h" />
   </ItemGroup>
@@ -92,6 +93,7 @@
     <ClCompile Include="pong.cpp" />
     <ClCompile Include="ppc.cpp" />
     <ClCompile Include="scene.cpp" />
+    <ClCompile Include="shadow_map.cpp" />
     <ClCompile Include="TM.cpp" />
     <ClCompile Include="V3.cpp" />
   </ItemGroup>
