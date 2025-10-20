@@ -24,16 +24,20 @@ public:
 
 	void clear();
 	void set(unsigned int color);
-	void set_zb(float z);
-
 	void set(int u, int v, unsigned int color);
-	void set_zb(int u, int v, float z);
-
 	void set_safe(int u, int v, unsigned int color);
+
+	void set_zb(float z);
+	void set_zb(int u, int v, float z);
 	void set_zb_safe(int u, int v, float z);
 
 	void set_with_zb(int u, int v, unsigned int color, float z);
 	void set_with_zb_safe(int u, int v, unsigned int color, float z);
+
+	void set_checker(int cw, unsigned int col0, unsigned int col1);
+
+	unsigned int get(int u, int v);
+	unsigned int get(float tu, float tv); //tu is [0, 1], tv is [0, 1]
 
 	bool is_farther(int u, int v, float z);
 	bool is_farther_safe(int u, int v, float z);
@@ -52,4 +56,6 @@ public:
 
 	void draw_2d_triangle(V3 V0, V3 V1, V3 V2, V3 C0, V3 C1, V3 C2);
 	void draw_3d_triangle(V3 V0, V3 V1, V3 V2, V3 C0, V3 C1, V3 C2, PPC* ppc);
+
+	void draw_2d_texture_triangle(V3 V0, V3 V1, V3 V2, V3 C0, V3 C1, V3 C2, bool mirror, FrameBuffer* tex);
 };

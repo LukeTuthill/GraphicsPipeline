@@ -75,7 +75,7 @@ void Scene::render_cameras_as_frames() {
 			float t = (float)f / (float)frames_per_camera;
 
 			fb->clear();
-			tm.rasterize(&ppc_start.interpolate(&ppc_end, t), fb, false);
+			tm.rasterize(&ppc_start.interpolate(&ppc_end, t), fb, false, false, false);
 			fb->redraw();
 			
 			// Save frame to TIFF file
@@ -112,14 +112,69 @@ void Scene::render() {
 void Scene::render(TM& tm) {
 	if (render_light)
 		tm.light_point(shadow_map, ppc->C, ambient_factor, specular_exp);
-	tm.rasterize(ppc, fb, render_light);
+	tm.rasterize(ppc, fb, render_light, false, false);
 }
 
 void Scene::DBG() {
 	cerr << endl;
-	int choice = 3;
+	int choice = 4;
 	
 	switch (choice) {
+	case 4: { //Texture test
+		TM bricks_tm = TM();
+		bricks_tm.set_as_quad(V3(0.0f, 0.0f, 0.0f), V3(0.0f, 50.0f, 100.0f),
+			V3(100.0f, 50.0f, 0.0f), V3(100.0f, 0.0f, 100.0f), 0xFF000000);
+
+		FrameBuffer* bricks_tex = new FrameBuffer(0, 0, 100, 100);
+		bricks_tex->load_tiff("textures/bricks.tiff");
+		
+		TM flag_tm = TM();
+		flag_tm.set_as_quad(V3(0.0f, 0.0f, 0.0f), V3(0.0f, 50.0f, 100.0f),
+			V3(100.0f, 50.0f, 0.0f), V3(100.0f, 0.0f, 100.0f), 0xFF000000);
+
+		FrameBuffer* flag_tex = new FrameBuffer(0, 0, 100, 100);
+		flag_tex->load_tiff("textures/purdue.tiff");
+
+		TM face_tm = TM();
+		face_tm.set_as_quad(V3(0.0f, 0.0f, 0.0f), V3(0.0f, 50.0f, 100.0f),
+			V3(100.0f, 50.0f, 0.0f), V3(100.0f, 0.0f, 100.0f), 0xFF000000);
+
+		FrameBuffer* face_tex = new FrameBuffer(0, 0, 100, 100);
+		face_tex->load_tiff("textures/popescu.tiff");
+
+		TM box_tm = TM();
+		box_tm.set_as_quad(V3(0.0f, 0.0f, 0.0f), V3(0.0f, 50.0f, 100.0f),
+			V3(100.0f, 50.0f, 0.0f), V3(100.0f, 0.0f, 100.0f), 0xFF000000);
+
+		FrameBuffer* box_tex = new FrameBuffer(0, 0, 100, 100);
+		box_tex->load_tiff("textures/amazon.tiff");
+
+		V3 tiling_tcs[4] = {V3(0.0f, 0.0f, 0.0f), V3(0.0f, 4.0f, 0.0f), V3(4.0f, 0.0f, 0.0f), V3(4.0f, 4.0f, 0.0f)};
+		V3 tcs[4] = {V3(0.0f, 0.0f, 0.0f), V3(0.0f, 1.0f, 0.0f), V3(1.0f, 0.0f, 0.0f), V3(1.0f, 1.0f, 0.0f)};
+
+		bricks_tm.set_tex(bricks_tex, tiling_tcs);
+		flag_tm.set_tex(flag_tex, tcs);
+		face_tm.set_tex(face_tex, tiling_tcs);
+		box_tm.set_tex(box_tex, tcs);
+
+		ppc->translate(V3(0.0f, 50.0f, 250.0f));
+
+		flag_tm.translate(V3(-150.0f, 0.0f, 0.0f));
+		face_tm.translate(V3(0.0f, 150.0f, 0.0f));
+		box_tm.translate(V3(150.0f, 0.0f, 0.0f));
+
+		while (true) {
+			fb->clear();
+
+			bricks_tm.rasterize(ppc, fb, false, true, mirror);
+			flag_tm.rasterize(ppc, fb, false, true, mirror);
+			face_tm.rasterize(ppc, fb, false, true, mirror);
+			box_tm.rasterize(ppc, fb, false, true, mirror);
+
+			fb->redraw();
+			Fl::check();
+		}
+	}
 	case 3: { //Moving triangle mesh with lighting
 		ppc->translate(V3(0.0f, 50.0f, 250.0f));
 		*point_light = tms[0].get_center() + V3(0.0f, 50.0f, 150.0f);

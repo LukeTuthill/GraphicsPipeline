@@ -20,6 +20,8 @@ public:
 	float ambient_factor;
 	int specular_exp;
 
+	bool mirror = false;
+
 	bool pong = false;
 	PongGame* pong_game;
 

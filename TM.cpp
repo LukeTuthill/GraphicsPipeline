@@ -80,6 +80,11 @@ TM::TM(V3 p1, V3 p2, unsigned int color) {
 	set_as_plane(p1, p2, color);
 }
 
+void TM::set_tex(FrameBuffer* tex, V3* tcs) {
+	this->tex = tex;
+	this->tcs = tcs;
+}
+
 void TM::draw_points(unsigned int color, int psize, PPC *ppc, 
 	FrameBuffer *fb) {
 	for (int vi = 0; vi < num_verts; vi++) {
@@ -211,6 +216,40 @@ void TM::get_bounding_box(V3& p1, V3& p2) {
 	p2[2] = max[2];
 }
 
+void TM::set_as_quad(V3 p1, V3 p2, V3 p3, V3 p4, unsigned int color) {
+	num_verts = 4;
+	num_tris = 2;
+
+	verts = new V3[num_verts];
+	projected_verts = new V3[num_verts];
+	normals = new V3[num_verts];
+	colors = new V3[num_verts];
+	lighted_colors = new V3[num_verts];
+	tris = new unsigned int[num_tris * 3];
+
+	V3 color_vector;
+	color_vector.set_as_color(color);
+
+	verts[0] = p1;
+	verts[1] = p2;
+	verts[2] = p3;
+	verts[3] = p4;
+
+	V3 normal = ((p2 - p1) ^ (p3 - p1)).normalized();
+
+	for (int vi = 0; vi < num_verts; vi++) {
+		normals[vi] = normal;
+		colors[vi] = color_vector;
+	}
+
+	tris[0] = 0;
+	tris[1] = 1;
+	tris[2] = 2;
+	tris[3] = 1;
+	tris[4] = 2;
+	tris[5] = 3;
+}
+
 void TM::set_as_plane(V3 p1, V3 p2, unsigned int color) {
 	V3 min_p(fmin(p1[0], p2[0]), p1[1], fmin(p1[2], p2[2]));
 	V3 max_p(fmax(p1[0], p2[0]), p1[1], fmax(p1[2], p2[2]));
@@ -316,7 +355,7 @@ void TM::render_as_wireframe(PPC* ppc, FrameBuffer* fb, bool is_lighted) {
 	}
 }
 
-void TM::rasterize(PPC* ppc, FrameBuffer* fb, bool is_lighted) {
+void TM::rasterize(PPC* ppc, FrameBuffer* fb, bool is_lighted, bool use_texture, bool mirror) {
 	for (int vi = 0; vi < num_verts; vi++) {
 		ppc->project(verts[vi], projected_verts[vi]);
 	}
@@ -332,6 +371,14 @@ void TM::rasterize(PPC* ppc, FrameBuffer* fb, bool is_lighted) {
 		if (V0[0] == FLT_MAX || V1[0] == FLT_MAX || V2[0] == FLT_MAX) // Behind the camera
 			continue;
 
+		if (tex && use_texture) {
+			V3 tex0 = tcs[v0];
+			V3 tex1 = tcs[v1];
+			V3 tex2 = tcs[v2];
+			fb->draw_2d_texture_triangle(V0, V1, V2, tex0, tex1, tex2, mirror, tex);
+			continue;
+		}
+
 		V3 C0, C1, C2;
 		if (is_lighted && lighted_colors) {
 			C0 = lighted_colors[v0];
@@ -346,6 +393,10 @@ void TM::rasterize(PPC* ppc, FrameBuffer* fb, bool is_lighted) {
 
 		fb->draw_2d_triangle(V0, V1, V2, C0, C1, C2);
 	}
+}
+
+void TM::set_eeqs(M33 proj_verts, M33& eeqs) {
+
 }
 
 void TM::visualize_normals(float nl, PPC* ppc, FrameBuffer* fb) {
@@ -436,9 +487,9 @@ void TM::load_bin(char *fname) {
 	}
 
 	ifs.read(&yn, 1); // texture coordinates 2 floats
-	float *tcs = 0; // don't have texture coordinates for now
-	if (tcs)
-		delete []tcs;
+	float* tcs = 0;
+	/*if (tcs)
+		delete []tcs;*/
 	tcs = 0;
 	if (yn == 'y') {
 		tcs = new float[num_verts * 2];

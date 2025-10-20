@@ -19,7 +19,10 @@ public:
 
 	V3* normals; // per-vertex normals
 
-	TM() : verts(0), num_verts(0), colors(0), tris(0), num_tris(0), normals(0) {};
+	V3* tcs; // texture coordinates per vertex
+	FrameBuffer* tex; // texture map
+
+	TM() : verts(0), projected_verts(0), num_verts(0), lighted_colors(0), colors(0), tris(0), num_tris(0), normals(0), tcs(0), tex(nullptr) {};
 	TM(char* fname);
 
 	//Cylinder constructor
@@ -30,6 +33,8 @@ public:
 
 	void load_bin(char *fname); // load from file
 
+	void set_tex(FrameBuffer* fb, V3* tcs);
+
 	void draw_points(unsigned int color, int psize, PPC *ppc,
 		FrameBuffer *fb);
 	void rotate_about_arbitrary_axis(V3 aO, V3 ad, float angle_degrees);
@@ -38,13 +43,16 @@ public:
 
 	void set_as_box(V3 p1, V3 p2, unsigned int color); 
 	void set_as_plane(V3 p1, V3 p2, unsigned int color);
+	void set_as_quad(V3 p1, V3 p2, V3 p3, V3 p4, unsigned int color);
     void get_bounding_box(V3& p1, V3& p2); // return p1, p2 via reference
 	void translate(V3 tv);
 	void position(V3 new_center);
 	void scale(float s);
 
 	void render_as_wireframe(PPC *ppc, FrameBuffer* fb, bool is_lighted);
-	void rasterize(PPC* ppc, FrameBuffer* fb, bool is_lighted);
+	void rasterize(PPC* ppc, FrameBuffer* fb, bool is_lighted, bool use_texture, bool mirror);
+
+	void set_eeqs(M33 proj_verts, M33& eeqs);
 
 	void visualize_normals(float nl, PPC* ppc, FrameBuffer* fb);
 

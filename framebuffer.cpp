@@ -54,7 +54,7 @@ void FrameBuffer::KeyboardHandle() {
 	int key = Fl::event_key();
 
 	if (!scene->ppc) return;
-	float move_constant = 1.0f;
+	float move_constant = 5.0f;
 	float rotation_constant = 2.0f;
 
 	if (scene->pong) {
@@ -83,6 +83,16 @@ void FrameBuffer::KeyboardHandle() {
 	}
 
 	switch (key) {
+	case 'm':
+	case 'M':
+		scene->mirror = !scene->mirror;
+		if (scene->mirror) {
+			cerr << "Mirror mode ON" << endl;
+		}
+		else {
+			cerr << "Mirror mode OFF" << endl;
+		}
+		break;
 	case '1': {
 		const char* val = fl_input("New Ambient Factor (0.0-1.0)", "0.4");
 		if (val) {
@@ -327,6 +337,16 @@ void FrameBuffer::set_with_zb_safe(int u, int v, unsigned int color, float z) {
 	set_with_zb(u, v, color, z);
 }
 
+unsigned int FrameBuffer::get(int u, int v) {
+	return pix[(h - 1 - v) * w + u];
+}
+
+unsigned int FrameBuffer::get(float tu, float tv) {
+	int u = (int)(tu * (w - 1));
+	int v = (int)(tv * (h - 1));
+	return get(u, v);
+}
+
 bool FrameBuffer::is_farther(int u, int v, float z) {
 	return zb[(h - 1 - v) * w + u] > z;
 }
@@ -471,7 +491,10 @@ void FrameBuffer::draw_3d_triangle(V3 V0, V3 V1, V3 V2, V3 C0, V3 C1, V3 C2, PPC
 }
 
 void FrameBuffer::draw_2d_triangle(V3 V0, V3 V1, V3 V2, V3 C0, V3 C1, V3 C2) {
-	float a[3], b[3], c[3];
+	V3 a = V3();
+	V3 b = V3();
+	V3 c = V3();
+
 	//0 to 1
 	a[0] = V1[1] - V0[1]; 
 	b[0] = -V1[0] + V0[0];
@@ -518,19 +541,16 @@ void FrameBuffer::draw_2d_triangle(V3 V0, V3 V1, V3 V2, V3 C0, V3 C1, V3 C2) {
 	int top = (int)(vmin + .5f);
 	int bottom = (int)(vmax - .5f);
 
-	float currEELS[3], currEE[3];
+	V3 currEELS = V3();
+	V3 currEE = V3();
 	
-	currEELS[0] = a[0] * (left + .5f) + b[0] * (top + .5f) + c[0];
-	currEELS[1] = a[1] * (left + .5f) + b[1] * (top + .5f) + c[1];
-	currEELS[2] = a[2] * (left + .5f) + b[2] * (top + .5f) + c[2];
+	currEELS = a * (left + .5f) + b * (top + .5f) + c;
 	
 	//Computes twice signed area of the triangle using edge function V0-V1 and V2
 	float area = a[0] * V2[0] + b[0] * V2[1] + c[0]; 
 
 	for (int v = top; v <= bottom; v++) {
-		currEE[0] = currEELS[0];
-		currEE[1] = currEELS[1];
-		currEE[2] = currEELS[2];
+		currEE = currEELS;
 		
 		for (int u = left; u <= right; u++) {
 			if (currEE[0] >= 0 && currEE[1] >= 0 && currEE[2] >= 0) {
@@ -546,13 +566,124 @@ void FrameBuffer::draw_2d_triangle(V3 V0, V3 V1, V3 V2, V3 C0, V3 C1, V3 C2) {
 				
 				set_with_zb(u, v, color_vector.convert_to_color_int(), curr_z);
 			}
-			currEE[0] += a[0];
-			currEE[1] += a[1];
-			currEE[2] += a[2];
+			currEE += a;
 		}
-		currEELS[0] += b[0];
-		currEELS[1] += b[1];
-		currEELS[2] += b[2];
+		currEELS += b;
 	}
 
+}
+
+void FrameBuffer::draw_2d_texture_triangle(V3 V0, V3 V1, V3 V2, V3 tex0, V3 tex1, V3 tex2, bool mirror, FrameBuffer* tex) {
+    V3 a = V3();
+    V3 b = V3();
+    V3 c = V3();
+
+    // 0 to 1
+    a[0] = V1[1] - V0[1];
+    b[0] = -V1[0] + V0[0];
+    c[0] = -V1[1] * V0[0] + V0[1] * V1[0];
+
+    // 1 to 2
+    a[1] = V2[1] - V1[1];
+    b[1] = -V2[0] + V1[0];
+    c[1] = -V2[1] * V1[0] + V1[1] * V2[0];
+
+    // 2 to 0
+    a[2] = V0[1] - V2[1];
+    b[2] = -V0[0] + V2[0];
+    c[2] = -V0[1] * V2[0] + V2[1] * V0[0];
+
+    float sidedness = a[0] * V2[0] + b[0] * V2[1] + c[0];
+    if (sidedness < 0) { a[0] *= -1; b[0] *= -1; c[0] *= -1; }
+
+    sidedness = a[1] * V0[0] + b[1] * V0[1] + c[1];
+    if (sidedness < 0) { a[1] *= -1; b[1] *= -1; c[1] *= -1; }
+
+    sidedness = a[2] * V1[0] + b[2] * V1[1] + c[2];
+    if (sidedness < 0) { a[2] *= -1; b[2] *= -1; c[2] *= -1; }
+
+    float umin = fmaxf(0.0f, fminf(fminf(V0[0], V1[0]), V2[0]));
+    float umax = fminf((float)(w - 1), fmaxf(fmaxf(V0[0], V1[0]), V2[0]));
+    float vmin = fmaxf(0.0f, fminf(fminf(V0[1], V1[1]), V2[1]));
+    float vmax = fminf((float)(h - 1), fmaxf(fmaxf(V0[1], V1[1]), V2[1]));
+
+    int left = (int)(umin + .5f);
+    int right = (int)(umax - .5f);
+    int top = (int)(vmin + .5f);
+    int bottom = (int)(vmax - .5f);
+
+    V3 currEELS = V3();
+    V3 currEE = V3();
+	
+	currEELS = a * (left + .5f) + b * (top + .5f) + c;
+	
+	// Twice the signed area for barycentric normalization
+	float area = a[0] * V2[0] + b[0] * V2[1] + c[0];
+	if (area == 0.0f) return;
+
+	float invz0 = V0[2];
+	float invz1 = V1[2];
+	float invz2 = V2[2];
+
+	float u_over_z0 = tex0[0] * invz0; float v_over_z0 = tex0[1] * invz0;
+	float u_over_z1 = tex1[0] * invz1; float v_over_z1 = tex1[1] * invz1;
+	float u_over_z2 = tex2[0] * invz2; float v_over_z2 = tex2[1] * invz2;
+
+    for (int v = top; v <= bottom; v++) {
+        currEE = currEELS;
+
+        for (int u = left; u <= right; u++) {
+            if (currEE[0] >= 0 && currEE[1] >= 0 && currEE[2] >= 0) {
+                // Barycentric weights (screen-space)
+                float w0 = (a[1] * u + b[1] * v + c[1]) / area;
+                float w1 = (a[2] * u + b[2] * v + c[2]) / area;
+                float w2 = 1.0f - w0 - w1;
+
+                // Interpolate depth for z-buffer (affine is fine for z)
+                float curr_z = w0 * V0[2] + w1 * V1[2] + w2 * V2[2];
+
+                // Perspective-correct interpolate texture coordinates
+                float invz = w0 * invz0 + w1 * invz1 + w2 * invz2;
+                float tu = (w0 * u_over_z0 + w1 * u_over_z1 + w2 * u_over_z2) / invz;
+                float tv = (w0 * v_over_z0 + w1 * v_over_z1 + w2 * v_over_z2) / invz;
+
+				if (!mirror) {
+					// Clamp to [0, 1] range while accounting for tiling, no mirroring
+					tu -= floor(tu);
+					tv -= floor(tv);
+				}
+				else {
+					//Mirroring mode for tiling
+					if (int(floor(tu)) % 2 == 1)
+						tu = 1.0f - (tu - floor(tu));
+					else
+						tu -= floor(tu);
+
+					if (int(floor(tv)) % 2 == 1)
+						tv = 1.0f - (tv - floor(tv));
+					else
+						tv -= floor(tv);
+				}
+
+				unsigned int color = tex->get(tu, tv);
+                set_with_zb(u, v, color, curr_z);
+            }
+            currEE += a;
+        }
+        currEELS += b;
+    }
+}
+
+void FrameBuffer::set_checker(int cw, unsigned int col0, unsigned int col1) {
+	for (int v = 0; v < h; v++) {
+		for (int u = 0; u < w; u++) {
+			int cu, cv;
+			cu = u / cw;
+			cv = v / cw;
+			if ((cu+cv)%2)
+				set(u, v, col0);
+			else
+				set(u, v, col1);
+		}
+	}
 }
