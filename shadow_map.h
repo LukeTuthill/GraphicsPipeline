@@ -1,14 +1,14 @@
 #pragma once
 
 #include "ppc.h"
+#include "cube_map.h"
 
 class TM; // Forward declaration
 
 class ShadowMap {
 public:
 	int w, h;
-	PPC* light_ppcs; // 6 cameras for cube map
-	float** zbs; // 6 z-buffers for cube map
+	CubeMap* cube_map; // 6 faces
 	V3 pos;
 
 	ShadowMap(int _w, int _h, V3 _light_pos);

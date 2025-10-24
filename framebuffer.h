@@ -5,9 +5,8 @@
 #include <GL/glut.h>
 
 #include "ppc.h"
-#include "v3.h"
-
-class PPC;
+ 
+class CubeMap;
 
 class FrameBuffer : public Fl_Gl_Window {
 public:
@@ -15,6 +14,7 @@ public:
 	float* zb;
 	int w, h;
 	bool move_light;
+	bool revolve_around_center;
 	FrameBuffer(int u0, int v0, int _w, int _h);
 	void draw();
 	int handle(int guievent);
@@ -39,6 +39,8 @@ public:
 	unsigned int get(int u, int v);
 	unsigned int get(float tu, float tv); //tu is [0, 1], tv is [0, 1]
 
+	float get_zb(int u, int v);
+
 	bool is_farther(int u, int v, float z);
 	bool is_farther_safe(int u, int v, float z);
 
@@ -57,5 +59,7 @@ public:
 	void draw_2d_triangle(V3 V0, V3 V1, V3 V2, V3 C0, V3 C1, V3 C2);
 	void draw_3d_triangle(V3 V0, V3 V1, V3 V2, V3 C0, V3 C1, V3 C2, PPC* ppc);
 
-	void draw_2d_texture_triangle(V3 V0, V3 V1, V3 V2, V3 C0, V3 C1, V3 C2, bool mirror, FrameBuffer* tex);
+	void draw_2d_texture_triangle(V3 V0, V3 V1, V3 V2, V3 C0, V3 C1, V3 C2, bool mirror_tiling, FrameBuffer* tex);
+
+	void draw_2d_mirrored_triangle(V3 V0, V3 V1, V3 V2, V3 N0, V3 N1, V3 N2, PPC* ppc, CubeMap* cube_map);
 };

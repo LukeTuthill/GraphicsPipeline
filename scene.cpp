@@ -38,6 +38,7 @@ Scene::Scene() {
 	tms[2] = TM(V3(-100.0f, 0.0f, -100.0f), V3(100.0f, 0.0f, 100.0f), 0xFF888888);
 
 	shadow_map = new ShadowMap(512, 512, V3());
+	cube_map = nullptr;
 	point_light = new V3();
 
 	pong_game = nullptr;
@@ -68,6 +69,7 @@ void Scene::render_cameras_as_frames() {
 	// Create frames directory
 	system("mkdir frames");
 
+	render_type rt = render_type::NOT_LIGHTED;
 	for (int p = 0; p < num_ppcs - 1; p++) {
 		PPC ppc_start = ppcs[p];
 		PPC ppc_end = ppcs[p + 1];
@@ -75,7 +77,7 @@ void Scene::render_cameras_as_frames() {
 			float t = (float)f / (float)frames_per_camera;
 
 			fb->clear();
-			tm.rasterize(&ppc_start.interpolate(&ppc_end, t), fb, false, false, false);
+			tm.rasterize(&ppc_start.interpolate(&ppc_end, t), fb, cube_map, rt);
 			fb->redraw();
 			
 			// Save frame to TIFF file
@@ -95,11 +97,11 @@ void Scene::render_shadows() {
 	}
 }
 
-void Scene::render() {
+void Scene::render(render_type rt) {
 	fb->clear();
 
 	for (int i = 0; i < num_tms; i++) {
-		render(tms[i]);
+		render(tms[i], rt);
 	}
 
 	if (render_light)
@@ -109,17 +111,30 @@ void Scene::render() {
 	Fl::check();
 }
 
-void Scene::render(TM& tm) {
+void Scene::render(TM& tm, render_type rt) {
 	if (render_light)
 		tm.light_point(shadow_map, ppc->C, ambient_factor, specular_exp);
-	tm.rasterize(ppc, fb, render_light, false, false);
+	tm.rasterize(ppc, fb, cube_map, rt);
 }
 
 void Scene::DBG() {
 	cerr << endl;
-	int choice = 4;
+	int choice = 5;
 	
 	switch (choice) {
+	case 5: { //Environemnt cube map test
+		cube_map = new CubeMap("textures/uffizi_cross.tiff");
+		ppc->translate(V3(0.0f, 0.0f, 250.0f));
+		tms[0].position(V3(0.0f, 0.0f, 0.0f));
+		render_type rt = render_type::MIRROR_ONLY;
+		while (true) {
+			fb->clear();
+			tms[0].rasterize(ppc, fb, cube_map, rt);
+			cube_map->render_as_environment(ppc, fb);
+			fb->redraw();
+			Fl::check();
+		}
+	}
 	case 4: { //Texture test
 		TM bricks_tm = TM();
 		bricks_tm.set_as_quad(V3(0.0f, 0.0f, 0.0f), V3(0.0f, 50.0f, 100.0f),
@@ -163,13 +178,20 @@ void Scene::DBG() {
 		face_tm.translate(V3(0.0f, 150.0f, 0.0f));
 		box_tm.translate(V3(150.0f, 0.0f, 0.0f));
 
+		render_type rt = render_type::NORMAL_TILING_TEXTURED;
+
 		while (true) {
 			fb->clear();
 
-			bricks_tm.rasterize(ppc, fb, false, true, mirror);
-			flag_tm.rasterize(ppc, fb, false, true, mirror);
-			face_tm.rasterize(ppc, fb, false, true, mirror);
-			box_tm.rasterize(ppc, fb, false, true, mirror);
+			if (mirror_tiling)
+				rt = render_type::MIRRORED_TILING_TEXTURED;
+			else
+				rt = render_type::NORMAL_TILING_TEXTURED;
+
+			bricks_tm.rasterize(ppc, fb, cube_map, rt);
+			flag_tm.rasterize(ppc, fb, cube_map, rt);
+			face_tm.rasterize(ppc, fb, cube_map, rt);
+			box_tm.rasterize(ppc, fb, cube_map, rt);
 
 			fb->redraw();
 			Fl::check();
@@ -180,24 +202,28 @@ void Scene::DBG() {
 		*point_light = tms[0].get_center() + V3(0.0f, 50.0f, 150.0f);
 		*point_light = point_light->rotate_point(tms[0].get_center(), V3(0.0f, 1.0f, 0.0f), 90.0f);
 		shadow_map->set_pos(*point_light);
+
+		render_type rt = render_type::LIGHTED;
 		
 		while (true) {
 			tms[1].rotate_about_arbitrary_axis(tms[0].get_center(), V3(0.0f, 1.0f, 0.0f), 1.0f);
 			shadow_map->set_pos(*point_light);
 			render_shadows();
-			render();
+			render(rt);
 		}
 		return;
 	}
 	case 2: { //Moving point light with shadows
 		ppc->translate(V3(0.0f, 50.0f, 250.0f));
 		*point_light = tms[0].get_center() + V3(0.0f, 50.0f, 150.0f);
-		shadow_map->set_pos(*point_light);
+
+		render_type rt = render_type::LIGHTED;
 		
 		while (true) {
+			*point_light = point_light->rotate_point(tms[0].get_center(), V3(0.0f, 1.0f, 0.0f), 2.0f);
 			shadow_map->set_pos(*point_light);
 			render_shadows();
-			render();
+			render(rt);
 		}
 		return;
 	}
@@ -207,18 +233,22 @@ void Scene::DBG() {
 		*point_light = point_light->rotate_point(tms[0].get_center(), V3(0.0f, 1.0f, 0.0f), 90.0f);
 
 		render_light = true;
+
+		render_type rt = render_type::LIGHTED;
 		while (true) {
 			shadow_map->set_pos(*point_light);
 			render_shadows();
-			render();
+			render(rt);
 		}
 		return;
 	}
 	case 0: { //Static render, loop allows camera movement
 		ppc->translate(V3(0.0f, 0.0f, 300.0f));
 		render_light = false;
+
+		render_type rt = render_type::NOT_LIGHTED;
 		while (true) {
-			render();
+			render(rt);
 		}
 		return;
 	}

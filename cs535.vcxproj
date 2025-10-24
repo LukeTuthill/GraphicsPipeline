@@ -76,6 +76,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClInclude Include="cube_map.h" />
     <ClInclude Include="framebuffer.h" />
     <ClInclude Include="gui.h" />
     <ClInclude Include="m33.h" />
@@ -87,6 +88,7 @@
     <ClInclude Include="v3.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="cube_map.cpp" />
     <ClCompile Include="framebuffer.cpp" />
     <ClCompile Include="gui.cxx" />
     <ClCompile Include="M33.cpp" />

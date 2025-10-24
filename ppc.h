@@ -25,6 +25,10 @@ public:
 	void translate_up(float t); //translate along b
 	void translate_forward(float t); //translate along c
 
+	void rotate_about_arbitrary_axis(V3 aO, V3 ad, float angle_degrees);
+	void revolve_left_right(V3 center, float angle_degrees); //revolve around b
+	void revolve_up_down(V3 center, float angle_degrees); //revolve around -a
+
 	void zoom(float s); //scale c by s, zoom in if s>0, out if s<0
 
 	PPC interpolate(PPC* ppc2, float t); //t in [0,1]

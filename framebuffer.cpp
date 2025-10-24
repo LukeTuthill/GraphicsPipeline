@@ -9,7 +9,7 @@
 #include "framebuffer.h"
 #include "scene.h"
 #include "pong.h"
-#include "ppc.h"
+#include "cube_map.h"
 
 using namespace std;
 
@@ -20,6 +20,7 @@ FrameBuffer::FrameBuffer(int u0, int v0, int _w, int _h) :
 	pix = new unsigned int[w*h];
 	zb = new float[w*h];
 	move_light = false;
+	revolve_around_center = false;
 }
 
 void FrameBuffer::draw() {
@@ -83,10 +84,20 @@ void FrameBuffer::KeyboardHandle() {
 	}
 
 	switch (key) {
+	case 'n':
+	case 'N':
+		revolve_around_center = !revolve_around_center;
+		if (revolve_around_center) {
+			cerr << "Revolve around center ON" << endl;
+		}
+		else {
+			cerr << "Revolve around center OFF" << endl;
+		}
+		break;
 	case 'm':
 	case 'M':
-		scene->mirror = !scene->mirror;
-		if (scene->mirror) {
+		scene->mirror_tiling = !scene->mirror_tiling;
+		if (scene->mirror_tiling) {
 			cerr << "Mirror mode ON" << endl;
 		}
 		else {
@@ -135,7 +146,7 @@ void FrameBuffer::KeyboardHandle() {
 	case 'b':
 	case 'B':
 		cerr << "Running camera path from cameras.bin" << endl;
-		scene->render();
+		scene->render_cameras_as_frames();
 		break;
 
 	case 'u':
@@ -199,18 +210,34 @@ void FrameBuffer::KeyboardHandle() {
 
 	case 'w':
 	case 'W':
+		if (revolve_around_center) {
+			scene->ppc->revolve_up_down(V3(0.0f, 0.0f, 0.0f), rotation_constant);
+			break;
+		}
 		scene->ppc->tilt(rotation_constant);
 		break;
 	case 's':
 	case 'S':
+		if (revolve_around_center) {
+			scene->ppc->revolve_up_down(V3(0.0f, 0.0f, 0.0f), -rotation_constant);
+			break;
+		}
 		scene->ppc->tilt(-rotation_constant);
 		break;
 	case 'a':
 	case 'A':
+		if (revolve_around_center) {
+			scene->ppc->revolve_left_right(V3(0.0f, 0.0f, 0.0f), rotation_constant);
+			break;
+		}
 		scene->ppc->pan(-rotation_constant);
 		break;
 	case 'd':
 	case 'D':
+		if (revolve_around_center) {
+			scene->ppc->revolve_left_right(V3(0.0f, 0.0f, 0.0f), -rotation_constant);
+			break;
+		}
 		scene->ppc->pan(rotation_constant);
 		break;
 	case 'r':
@@ -270,7 +297,7 @@ void FrameBuffer::save_as_tiff(char *fname) {
 
 	if (out == NULL) {
 		cerr << fname << " could not be opened" << endl;
-		return;
+		throw new runtime_error("TIFF file could not be found");
 	}
 
 	TIFFSetField(out, TIFFTAG_IMAGEWIDTH, w);
@@ -347,8 +374,12 @@ unsigned int FrameBuffer::get(float tu, float tv) {
 	return get(u, v);
 }
 
+float FrameBuffer::get_zb(int u, int v) {
+	return zb[(h - 1 - v) * w + u];
+}
+
 bool FrameBuffer::is_farther(int u, int v, float z) {
-	return zb[(h - 1 - v) * w + u] > z;
+	return get_zb(u, v) > z;
 }
 
 bool FrameBuffer::is_farther_safe(int u, int v, float z) {
@@ -573,7 +604,7 @@ void FrameBuffer::draw_2d_triangle(V3 V0, V3 V1, V3 V2, V3 C0, V3 C1, V3 C2) {
 
 }
 
-void FrameBuffer::draw_2d_texture_triangle(V3 V0, V3 V1, V3 V2, V3 tex0, V3 tex1, V3 tex2, bool mirror, FrameBuffer* tex) {
+void FrameBuffer::draw_2d_texture_triangle(V3 V0, V3 V1, V3 V2, V3 tex0, V3 tex1, V3 tex2, bool mirror_tiling, FrameBuffer* tex) {
     V3 a = V3();
     V3 b = V3();
     V3 c = V3();
@@ -621,13 +652,14 @@ void FrameBuffer::draw_2d_texture_triangle(V3 V0, V3 V1, V3 V2, V3 tex0, V3 tex1
 	float area = a[0] * V2[0] + b[0] * V2[1] + c[0];
 	if (area == 0.0f) return;
 
-	float invz0 = V0[2];
-	float invz1 = V1[2];
-	float invz2 = V2[2];
+	V3 invz = { V0[2], V1[2], V2[2] };
 
-	float u_over_z0 = tex0[0] * invz0; float v_over_z0 = tex0[1] * invz0;
-	float u_over_z1 = tex1[0] * invz1; float v_over_z1 = tex1[1] * invz1;
-	float u_over_z2 = tex2[0] * invz2; float v_over_z2 = tex2[1] * invz2;
+	V3 tex0_over_z = tex0 * invz[0];
+	V3 tex1_over_z = tex1 * invz[1];
+	V3 tex2_over_z = tex2 * invz[2];
+
+	V3 u_over_z = { tex0_over_z[0], tex1_over_z[0], tex2_over_z[0] };
+	V3 v_over_z = { tex0_over_z[1], tex1_over_z[1], tex2_over_z[1] };
 
     for (int v = top; v <= bottom; v++) {
         currEE = currEELS;
@@ -639,15 +671,16 @@ void FrameBuffer::draw_2d_texture_triangle(V3 V0, V3 V1, V3 V2, V3 tex0, V3 tex1
                 float w1 = (a[2] * u + b[2] * v + c[2]) / area;
                 float w2 = 1.0f - w0 - w1;
 
+				V3 w = { w0, w1, w2 };
+
                 // Interpolate depth for z-buffer (affine is fine for z)
-                float curr_z = w0 * V0[2] + w1 * V1[2] + w2 * V2[2];
+				float curr_z = w * invz;
 
                 // Perspective-correct interpolate texture coordinates
-                float invz = w0 * invz0 + w1 * invz1 + w2 * invz2;
-                float tu = (w0 * u_over_z0 + w1 * u_over_z1 + w2 * u_over_z2) / invz;
-                float tv = (w0 * v_over_z0 + w1 * v_over_z1 + w2 * v_over_z2) / invz;
+				float tu = w * u_over_z / curr_z;
+				float tv = w * v_over_z / curr_z;
 
-				if (!mirror) {
+				if (!mirror_tiling) {
 					// Clamp to [0, 1] range while accounting for tiling, no mirroring
 					tu -= floor(tu);
 					tv -= floor(tv);
@@ -686,4 +719,91 @@ void FrameBuffer::set_checker(int cw, unsigned int col0, unsigned int col1) {
 				set(u, v, col1);
 		}
 	}
+}
+
+void FrameBuffer::draw_2d_mirrored_triangle(V3 V0, V3 V1, V3 V2, V3 N0, V3 N1, V3 N2, PPC* ppc, CubeMap* cube_map) {
+    V3 a = V3();
+    V3 b = V3();
+    V3 c = V3();
+
+    // 0 to 1
+    a[0] = V1[1] - V0[1];
+    b[0] = -V1[0] + V0[0];
+    c[0] = -V1[1] * V0[0] + V0[1] * V1[0];
+
+    // 1 to 2
+    a[1] = V2[1] - V1[1];
+    b[1] = -V2[0] + V1[0];
+    c[1] = -V2[1] * V1[0] + V1[1] * V2[0];
+
+    // 2 to 0
+    a[2] = V0[1] - V2[1];
+    b[2] = -V0[0] + V2[0];
+    c[2] = -V0[1] * V2[0] + V2[1] * V0[0];
+
+    float sidedness = a[0] * V2[0] + b[0] * V2[1] + c[0];
+    if (sidedness < 0) { a[0] *= -1; b[0] *= -1; c[0] *= -1; }
+
+    sidedness = a[1] * V0[0] + b[1] * V0[1] + c[1];
+    if (sidedness < 0) { a[1] *= -1; b[1] *= -1; c[1] *= -1; }
+
+    sidedness = a[2] * V1[0] + b[2] * V1[1] + c[2];
+    if (sidedness < 0) { a[2] *= -1; b[2] *= -1; c[2] *= -1; }
+
+    float umin = fmaxf(0.0f, fminf(fminf(V0[0], V1[0]), V2[0]));
+    float umax = fminf((float)(w - 1), fmaxf(fmaxf(V0[0], V1[0]), V2[0]));
+    float vmin = fmaxf(0.0f, fminf(fminf(V0[1], V1[1]), V2[1]));
+    float vmax = fminf((float)(h - 1), fmaxf(fmaxf(V0[1], V1[1]), V2[1]));
+
+    int left = (int)(umin + .5f);
+    int right = (int)(umax - .5f);
+    int top = (int)(vmin + .5f);
+    int bottom = (int)(vmax - .5f);
+
+    V3 currEELS = V3();
+    V3 currEE = V3();
+	
+	currEELS = a * (left + .5f) + b * (top + .5f) + c;
+	
+	// Twice the signed area for barycentric normalization
+	float area = a[0] * V2[0] + b[0] * V2[1] + c[0];
+	if (area == 0.0f) return;
+
+	V3 invz = { V0[2], V1[2], V2[2] };
+
+	V3 n0_over_z = N0 * invz[0];
+	V3 n1_over_z = N1 * invz[1];
+	V3 n2_over_z = N2 * invz[2];
+
+	M33 n_matrix;
+	n_matrix.set_column(0, n0_over_z);
+	n_matrix.set_column(1, n1_over_z);
+	n_matrix.set_column(2, n2_over_z);
+	
+
+    for (int v = top; v <= bottom; v++) {
+        currEE = currEELS;
+
+        for (int u = left; u <= right; u++) {
+            if (currEE[0] >= 0 && currEE[1] >= 0 && currEE[2] >= 0) {
+                // Barycentric weights (screen-space)
+                float w0 = (a[1] * u + b[1] * v + c[1]) / area;
+                float w1 = (a[2] * u + b[2] * v + c[2]) / area;
+                float w2 = 1.0f - w0 - w1;
+				V3 w = { w0, w1, w2 };
+
+                // Interpolate depth for z-buffer 
+				float curr_z = w * invz;
+
+                // Perspective-correct interpolate normal vector (model space)
+				V3 n = n_matrix * w / curr_z;
+
+                unsigned int color = cube_map->get_color(n.reflected(ppc->C - V3((float)u, (float)v, curr_z)));
+				set_with_zb(u, v, color, curr_z);
+
+            }
+            currEE += a;
+        }
+        currEELS += b;
+    }
 }

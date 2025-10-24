@@ -15,12 +15,13 @@ public:
 	int num_tms;
 	TM* tms;
 	ShadowMap* shadow_map;
+	CubeMap* cube_map;
 
 	bool render_light;
 	float ambient_factor;
 	int specular_exp;
 
-	bool mirror = false;
+	bool mirror_tiling = false;
 
 	bool pong = false;
 	PongGame* pong_game;
@@ -28,9 +29,9 @@ public:
 	Scene();
 	void DBG();
 	void NewButton();
-	void render();
+	void render(render_type rt);
 	void render_shadows();
-	void render(TM& tm);
+	void render(TM& tm, render_type rt);
 	void render_cameras_as_frames();
 };
 

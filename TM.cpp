@@ -2,6 +2,8 @@
 #include <cmath>
 
 #include "tm.h"
+#include "shadow_map.h"
+
 #include <fstream>
 #include <iostream>
 
@@ -355,7 +357,7 @@ void TM::render_as_wireframe(PPC* ppc, FrameBuffer* fb, bool is_lighted) {
 	}
 }
 
-void TM::rasterize(PPC* ppc, FrameBuffer* fb, bool is_lighted, bool use_texture, bool mirror) {
+void TM::rasterize(PPC* ppc, FrameBuffer* fb, CubeMap* cube_map, render_type rt) {
 	for (int vi = 0; vi < num_verts; vi++) {
 		ppc->project(verts[vi], projected_verts[vi]);
 	}
@@ -371,16 +373,21 @@ void TM::rasterize(PPC* ppc, FrameBuffer* fb, bool is_lighted, bool use_texture,
 		if (V0[0] == FLT_MAX || V1[0] == FLT_MAX || V2[0] == FLT_MAX) // Behind the camera
 			continue;
 
-		if (tex && use_texture) {
+		if (rt == render_type::MIRROR_ONLY) {
+			fb->draw_2d_mirrored_triangle(V0, V1, V2, normals[v0], normals[v1], normals[v2], ppc, cube_map);
+			continue;
+		}
+
+		if (tex && (rt == render_type::NORMAL_TILING_TEXTURED || rt == render_type::MIRRORED_TILING_TEXTURED)) {
 			V3 tex0 = tcs[v0];
 			V3 tex1 = tcs[v1];
 			V3 tex2 = tcs[v2];
-			fb->draw_2d_texture_triangle(V0, V1, V2, tex0, tex1, tex2, mirror, tex);
+			fb->draw_2d_texture_triangle(V0, V1, V2, tex0, tex1, tex2, rt == render_type::MIRRORED_TILING_TEXTURED, tex);
 			continue;
 		}
 
 		V3 C0, C1, C2;
-		if (is_lighted && lighted_colors) {
+		if (rt == render_type::LIGHTED && lighted_colors) {
 			C0 = lighted_colors[v0];
 			C1 = lighted_colors[v1];
 			C2 = lighted_colors[v2];

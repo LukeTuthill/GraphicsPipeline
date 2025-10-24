@@ -6,34 +6,8 @@ ShadowMap::ShadowMap(int _w, int _h, V3 _light_pos) {
 	w = _w;
 	h = _h;
 	pos = _light_pos;
-
-	light_ppcs = new PPC[6];
-	zbs = new float*[6];
-	for (int i = 0; i < 6; i++) {
-		light_ppcs[i] = PPC(90.0f, w, h);
-		light_ppcs[i].C = pos;
-		zbs[i] = new float[w * h];
-		for (int uv = 0; uv < w * h; uv++) {
-			zbs[i][uv] = 0.0f;
-		}
-	}
-
-	// -Z (face 5): Default orientation, no rotation needed.
 	
-	// +Z (face 4): Pan 180 degrees from -Z.
-	light_ppcs[4].pan(180.0f);
-
-	// +X (face 0): Pan 90 degrees from -Z.
-	light_ppcs[0].pan(90.0f);
-
-	// -X (face 1): Pan -90 degrees from -Z.
-	light_ppcs[1].pan(-90.0f);
-
-	// +Y (face 2): Tilt 90 degrees from -Z.
-	light_ppcs[2].tilt(90.0f);
-
-	// -Y (face 3): Tilt -90 degrees from -Z.
-	light_ppcs[3].tilt(-90.0f);
+	cube_map = new CubeMap(w, h, pos);
 
 	clear();
 }
@@ -41,26 +15,24 @@ ShadowMap::ShadowMap(int _w, int _h, V3 _light_pos) {
 void ShadowMap::set_pos(V3 new_pos) {
 	pos = new_pos;
 	for (int i = 0; i < 6; i++) {
-		light_ppcs[i].C = pos;
+		cube_map->ppcs[i]->C = pos;
 	}
 }
 
 void ShadowMap::clear() {
 	for (int i = 0; i < 6; i++) {
-		for (int uv = 0; uv < w * h; uv++) {
-			zbs[i][uv] = 0.0f;
-		}
+		cube_map->faces[i]->clear();
 	}
 }
 
 void ShadowMap::check_and_set_zb(int face_idx, int u, int v, float z) {
-	if (z > zbs[face_idx][(h - 1 - v) * w + u]) {
-		zbs[face_idx][(h - 1 - v) * w + u] = z;
+	if (z > cube_map->faces[face_idx]->zb[(h - 1 - v) * w + u]) {
+		cube_map->faces[face_idx]->zb[(h - 1 - v) * w + u] = z;
 	}
 }
 
 bool ShadowMap::is_farther(int face_idx, int u, int v, float z) {
-	return z < zbs[face_idx][(h - 1 - v) * w + u] - .01f;
+	return z < cube_map->faces[face_idx]->zb[(h - 1 - v) * w + u] - .01f;
 }
 
 int ShadowMap::get_face_index(V3 P) {
@@ -82,7 +54,7 @@ int ShadowMap::get_face_index(V3 P) {
 void ShadowMap::project_and_set(V3 P) {
 	int face_idx = get_face_index(P);
 	V3 PP;
-	if (!light_ppcs[face_idx].project(P, PP)) return;
+	if (!cube_map->ppcs[face_idx]->project(P, PP)) return;
 	int u = (int)PP[0];
 	int v = (int)PP[1];
 	float z = PP[2];
@@ -93,7 +65,7 @@ void ShadowMap::project_and_set(V3 P) {
 bool ShadowMap::in_shadow(V3 P) {
 	int face_idx = get_face_index(P);
 	V3 PP;
-	if (!light_ppcs[face_idx].project(P, PP)) return false;
+	if (!cube_map->ppcs[face_idx]->project(P, PP)) return false;
 	int u = (int)PP[0];
 	int v = (int)PP[1];
 	float z = PP[2];

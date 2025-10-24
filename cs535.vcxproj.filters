@@ -10,6 +10,7 @@
     <ClCompile Include="ppc.cpp" />
     <ClCompile Include="TM.cpp" />
     <ClCompile Include="shadow_map.cpp" />
+    <ClCompile Include="cube_map.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="framebuffer.h" />
@@ -21,6 +22,7 @@
     <ClInclude Include="ppc.h" />
     <ClInclude Include="tm.h" />
     <ClInclude Include="shadow_map.h" />
+    <ClInclude Include="cube_map.h" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="CG">

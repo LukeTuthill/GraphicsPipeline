@@ -78,9 +78,10 @@ void PPC::pan(float angle_degrees) {
 }
 
 void PPC::roll(float angle_degrees) {
-	a = a.rotate_point(V3(0, 0, 0), c, angle_degrees);
-	b = b.rotate_point(V3(0, 0, 0), c, angle_degrees);
-	c = c.rotate_point(V3(0, 0, 0), c, angle_degrees);
+	V3 axis = get_vd();
+	a = a.rotate_point(V3(0, 0, 0), axis, angle_degrees);
+	b = b.rotate_point(V3(0, 0, 0), axis, angle_degrees);
+	c = c.rotate_point(V3(0, 0, 0), axis, angle_degrees);
 
 	m.set_column(0, a);
 	m.set_column(1, b);
@@ -105,6 +106,28 @@ void PPC::zoom(float s) {
 
 	m.set_column(2, c);
 	m_inverted = m.inverted();
+}
+
+
+void PPC::rotate_about_arbitrary_axis(V3 aO, V3 ad, float angle_degrees) {
+	a = a.rotate_point(aO, ad, angle_degrees);
+	b = b.rotate_point(aO, ad, angle_degrees);
+	c = c.rotate_point(aO, ad, angle_degrees);
+	C = C.rotate_point(aO, ad, angle_degrees);
+
+	m.set_column(0, a);
+	m.set_column(1, b);
+	m.set_column(2, c);
+	m_inverted = m.inverted();
+}
+
+
+void PPC::revolve_left_right(V3 center, float angle_degrees) {
+	rotate_about_arbitrary_axis(center, b, angle_degrees);
+}
+
+void PPC::revolve_up_down(V3 center, float angle_degrees) {
+	rotate_about_arbitrary_axis(center, -1 * a, angle_degrees);
 }
 
 PPC PPC::interpolate(PPC* ppc2, float t) {
