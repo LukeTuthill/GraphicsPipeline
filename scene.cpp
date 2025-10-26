@@ -26,16 +26,16 @@ Scene::Scene() {
 	ambient_factor = .4f;
 	specular_exp = 200;
 
-	num_tms = 3;
+	num_tms = 1;
 	tms = new TM[num_tms];
 	tms[0] = TM("geometry/teapot57K.bin");
-	tms[1] = TM("geometry/teapot57K.bin");
-	tms[1].translate(V3(75.0f, 25.0f, 0.0f));
-	tms[1].scale(0.5f);
+	//tms[1] = TM("geometry/teapot57K.bin");
+	//tms[1].translate(V3(75.0f, 25.0f, 0.0f));
+	//tms[1].scale(0.5f);
 	//tms[1] = TM(V3(-100.0f, 0.0f, -100.0f), V3(100.0f, 0.0f, 100.0f), 0xFFFF00FF);
 	//tms[1].rotate_about_arbitrary_axis(tms[1].get_center(), V3(0.0f, 0.0f, 1.0f), 90.0f);
 	//tms[1].translate(V3(50.0f, 50.0f, 0.0f));
-	tms[2] = TM(V3(-100.0f, 0.0f, -100.0f), V3(100.0f, 0.0f, 100.0f), 0xFF888888);
+	//tms[2] = TM(V3(-100.0f, 0.0f, -100.0f), V3(100.0f, 0.0f, 100.0f), 0xFF888888);
 
 	shadow_map = new ShadowMap(512, 512, V3());
 	cube_map = nullptr;
@@ -107,6 +107,9 @@ void Scene::render(render_type rt) {
 	if (render_light)
 		fb->visualize_point_light(*point_light, ppc);
 
+	if (cube_map)
+		cube_map->render_as_environment(ppc, fb);
+
 	fb->redraw();
 	Fl::check();
 }
@@ -122,17 +125,13 @@ void Scene::DBG() {
 	int choice = 5;
 	
 	switch (choice) {
-	case 5: { //Environemnt cube map test
+	case 5: { //Environment cube map with reflective object test
 		cube_map = new CubeMap("textures/uffizi_cross.tiff");
 		ppc->translate(V3(0.0f, 0.0f, 250.0f));
 		tms[0].position(V3(0.0f, 0.0f, 0.0f));
 		render_type rt = render_type::MIRROR_ONLY;
 		while (true) {
-			fb->clear();
-			tms[0].rasterize(ppc, fb, cube_map, rt);
-			cube_map->render_as_environment(ppc, fb);
-			fb->redraw();
-			Fl::check();
+			render(rt);
 		}
 	}
 	case 4: { //Texture test

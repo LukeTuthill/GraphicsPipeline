@@ -674,7 +674,7 @@ void FrameBuffer::draw_2d_texture_triangle(V3 V0, V3 V1, V3 V2, V3 tex0, V3 tex1
 				V3 w = { w0, w1, w2 };
 
                 // Interpolate depth for z-buffer (affine is fine for z)
-				float curr_z = w * invz;
+				float curr_z = w * invz + .00001f;
 
                 // Perspective-correct interpolate texture coordinates
 				float tu = w * u_over_z / curr_z;
@@ -793,7 +793,7 @@ void FrameBuffer::draw_2d_mirrored_triangle(V3 V0, V3 V1, V3 V2, V3 N0, V3 N1, V
 				V3 w = { w0, w1, w2 };
 
                 // Interpolate depth for z-buffer 
-				float curr_z = w * invz;
+				float curr_z = w * invz + .00001f;
 
                 // Perspective-correct interpolate normal vector (model space)
 				V3 n = n_matrix * w / curr_z;
