@@ -33,7 +33,7 @@ Scene::Scene() {
 	ambient_factor = .4f;
 	specular_exp = 200;
 
-	num_tms = 1;
+	num_tms = 3;
 	tms = new TM[num_tms];
 	tms[0] = TM("geometry/teapot1K.bin");
 	if (num_tms > 1) {
@@ -59,10 +59,9 @@ Scene::Scene() {
 	gui->uiw->position(u0, v0 + fb->h + v0);
 
 	hw_fb->ppc = ppc;
-	hw_fb->tms = tms;
-	hw_fb->num_tms = num_tms;
+	hw_fb->set_tms(tms, num_tms);
 	hw_fb->set_shadow_map(*point_light, 512);
-
+	hw_fb->set_lighting(*point_light);
 }
 
 void Scene::render_cameras_as_frames() {
@@ -140,6 +139,10 @@ void Scene::render(render_type rt) {
 	if (hw_fb) {
 		hw_fb->ppc = ppc;
 		hw_fb->render_wireframe = render_wireframe;
+		if (rt == render_type::LIGHTED)
+			hw_fb->use_lighting = render_light;
+		else
+			hw_fb->use_lighting = false;
 		hw_fb->redraw();
 	}
 
@@ -156,7 +159,7 @@ void Scene::render(TM& tm, render_type rt) {
 
 void Scene::DBG() {
 	cerr << endl;
-	int choice = 5;
+	int choice = 2;
 	
 	switch (choice) {
 	case 5: { //Environment cube map with reflective object test
@@ -167,6 +170,7 @@ void Scene::DBG() {
 
 		if (hw_fb) {
 			hw_fb->set_environment_map(cube_map);
+			hw_fb->tm_is_mirror[0] = true;
 		}
 
 		while (true) {
@@ -230,6 +234,8 @@ void Scene::DBG() {
 		while (true) {
 			*point_light = point_light->rotate_point(tms[0].get_center(), V3(0.0f, 1.0f, 0.0f), 2.0f);
 			shadow_map->set_pos(*point_light);
+			if (hw_fb)
+				hw_fb->move_light(*point_light);
 			render_shadows();
 			render(rt);
 		}
@@ -239,6 +245,9 @@ void Scene::DBG() {
 		ppc->translate(V3(0.0f, 50.0f, 300.0f));
 		*point_light = tms[0].get_center() + V3(0.0f, 50.0f, 150.0f);
 		*point_light = point_light->rotate_point(tms[0].get_center(), V3(0.0f, 1.0f, 0.0f), 90.0f);
+		if (hw_fb) {
+			hw_fb->move_light(*point_light);
+		}
 
 		render_light = true;
 

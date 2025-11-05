@@ -13,11 +13,14 @@ HWFrameBuffer::HWFrameBuffer(int u0, int v0, int _w, int _h) : FrameBuffer(u0, v
 	ppc = nullptr;
 	tms = nullptr;
 	num_tms = 0;
+	tm_is_mirror = nullptr;
 
 	shadow_fb = 0;
 	shadow_map = 0;
 	shadow_map_size = 512;
 	shadows_enabled = false;
+
+	use_lighting = false;
 	light_ppc = nullptr;
 	light_pos = V3(0.0f, 100.0f, 0.0f);
 
@@ -41,7 +44,36 @@ void HWFrameBuffer::init() {
 	if (environment_map_enabled)
 		init_environment_map();
 
+	if (use_lighting)
+		init_lighting();
+
 	initialized = true; 
+}
+
+void HWFrameBuffer::init_lighting() {
+	glEnable(GL_LIGHTING);
+	glEnable(GL_LIGHT0);
+
+	GLfloat ambient[] = { 0.2f, 0.2f, 0.2f, 1.0f };
+	GLfloat diffuse[] = { 0.8f, 0.8f, 0.8f, 1.0f };
+	GLfloat specular[] = { 1.0f, 1.0f, 1.0f, 1.0f };
+
+	glLightfv(GL_LIGHT0, GL_AMBIENT, ambient);
+	glLightfv(GL_LIGHT0, GL_DIFFUSE, diffuse);
+	glLightfv(GL_LIGHT0, GL_SPECULAR, specular);
+
+	GLfloat mat_specular[] = { 1.0f, 1.0f, 1.0f, 1.0f };
+	GLfloat mat_shininess[] = { 50.0f };
+
+	glMaterialfv(GL_FRONT_AND_BACK, GL_SPECULAR, mat_specular);
+	glMaterialfv(GL_FRONT_AND_BACK, GL_SHININESS, mat_shininess);
+
+	// Enable color material so vertex colors work with lighting
+	glEnable(GL_COLOR_MATERIAL);
+	glColorMaterial(GL_FRONT_AND_BACK, GL_AMBIENT_AND_DIFFUSE);
+
+	//Auto normalization of normals
+	glEnable(GL_NORMALIZE);
 }
 
 void HWFrameBuffer::init_textures() {
@@ -155,8 +187,17 @@ void HWFrameBuffer::init_environment_map() {
 void HWFrameBuffer::set_tms(TM* tms, int num_tms) {
 	this->tms = tms;
 	this->num_tms = num_tms;
+	if (tm_is_mirror)
+		delete[] tm_is_mirror;
+	tm_is_mirror = new bool[num_tms];
 
 	initialized = false;
+}
+
+void HWFrameBuffer::set_lighting(V3 light_pos) {
+	this->light_pos = light_pos;
+	initialized = false;
+	use_lighting = true;
 }
 
 void HWFrameBuffer::set_shadow_map(V3 light_pos, int shadow_map_size) {
@@ -221,6 +262,12 @@ void HWFrameBuffer::draw() {
 	if (!initialized)
 		init();
 
+	if (use_lighting) {
+		// Update light position
+		GLfloat light_position[] = { light_pos[0], light_pos[1], light_pos[2], 1.0f };
+		glLightfv(GL_LIGHT0, GL_POSITION, light_position);
+	}
+
 	if (shadows_enabled)
 		render_shadow_map();
 
@@ -240,7 +287,7 @@ void HWFrameBuffer::draw() {
 
 	// iterate over all triangle meshes and draw current triangle mesh
 	for (int tmi = 0; tmi < num_tms; tmi++) {
-		render(&tms[tmi]);
+		render(&tms[tmi], tm_is_mirror[tmi]);
 	}
 
 	if (shadows_enabled) {
@@ -252,9 +299,11 @@ void HWFrameBuffer::draw() {
 	}
 
 	render_fps_counter();
+
+	visualize_point_light();
 }
 
-void HWFrameBuffer::render(TM* tm) {
+void HWFrameBuffer::render(TM* tm, bool is_mirror) {
 	//Inline check for wireframe or filled in rendering
 	glPolygonMode(GL_FRONT_AND_BACK, render_wireframe ? GL_LINE : GL_FILL);
 
@@ -264,12 +313,29 @@ void HWFrameBuffer::render(TM* tm) {
 	glEnableClientState(GL_NORMAL_ARRAY);
 	glNormalPointer(GL_FLOAT, 0, (float*)tm->normals);
 
-	if (has_textures && tm->tex) {
+	//Mirrored surface rendering
+	if (is_mirror && environment_map_enabled && env_cube_map_id != 0) {
+		glEnable(GL_TEXTURE_CUBE_MAP);
+		glBindTexture(GL_TEXTURE_CUBE_MAP, env_cube_map_id);
+
+		// Enable automatic reflection texture coordinate generation
+		glEnable(GL_TEXTURE_GEN_S);
+		glEnable(GL_TEXTURE_GEN_T);
+		glEnable(GL_TEXTURE_GEN_R);
+
+		// Set the texture generation mode to reflection mapping
+		glTexGeni(GL_S, GL_TEXTURE_GEN_MODE, GL_REFLECTION_MAP);
+		glTexGeni(GL_T, GL_TEXTURE_GEN_MODE, GL_REFLECTION_MAP);
+		glTexGeni(GL_R, GL_TEXTURE_GEN_MODE, GL_REFLECTION_MAP);
+	}
+	//Textured surface rendering
+	else if (has_textures && tm->tex) {
 		glEnable(GL_TEXTURE_2D);
 		glBindTexture(GL_TEXTURE_2D, tm->tex_id);
 		glEnableClientState(GL_TEXTURE_COORD_ARRAY);
 		glTexCoordPointer(2, GL_FLOAT, sizeof(V3), (float*)tm->tcs);
 	}
+	//Standard color interpolation rendering
 	else {
 		glEnableClientState(GL_COLOR_ARRAY);
 		glColorPointer(3, GL_FLOAT, 0, (float*)tm->colors);
@@ -411,6 +477,14 @@ void HWFrameBuffer::render_environment_map() {
 
 	// Restore state
 	glPopAttrib();
+}
+
+void HWFrameBuffer::visualize_point_light() {
+	glPointSize(10.0f);
+	glBegin(GL_POINTS);
+	glColor3f(0.0f, 0.0f, 1.0f);
+	glVertex3fv((float*)&light_pos);
+	glEnd();
 }
 
 void HWFrameBuffer::render_fps_counter() {

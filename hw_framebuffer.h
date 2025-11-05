@@ -12,6 +12,9 @@ public:
 	TM* tms;
 	int num_tms;
 
+	bool* tm_is_mirror;
+
+	bool use_lighting;
 	bool has_textures;
 	
 	GLuint shadow_fb; //Framebuffer for shadow map
@@ -34,11 +37,13 @@ public:
 	HWFrameBuffer(int u0, int v0, int _w, int _h);
 	
 	void init();
+	void init_lighting();
 	void init_textures();
 	void init_shadow_map();
 	void init_environment_map();
 
 	void set_tms(TM* tms, int num_tms);
+	void set_lighting(V3 light_pos);
 	void set_shadow_map(V3 light_pos, int shadow_map_size);
 	void set_environment_map(CubeMap* cube_map);
 
@@ -49,11 +54,12 @@ public:
 	void set_intrinsics(PPC* ppc);
 	void set_extrinsics(PPC* ppc);
 
-	void render(TM* tm);
+	void render(TM* tm, bool is_mirror);
 	void render_shadow_map();
 	void render_shadows();
 	void render_environment_map();
 
 	void render_fps_counter();
+	void visualize_point_light();
 };
 
