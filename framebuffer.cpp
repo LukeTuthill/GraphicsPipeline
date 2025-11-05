@@ -21,16 +21,14 @@ FrameBuffer::FrameBuffer(int u0, int v0, int _w, int _h) :
 	zb = new float[w*h];
 	move_light = false;
 	revolve_around_center = false;
-}
+
+	}
 
 void FrameBuffer::draw() {
-
 	glDrawPixels(w, h, GL_RGBA, GL_UNSIGNED_BYTE, pix);
-
 }
 
 int FrameBuffer::handle(int event) {
-
 	switch (event)
 	{
 	case FL_KEYBOARD: {
@@ -84,6 +82,16 @@ void FrameBuffer::KeyboardHandle() {
 	}
 
 	switch (key) {
+	case 'c':
+	case 'C':
+		scene->render_wireframe = !scene->render_wireframe;
+		if (scene->render_wireframe) {
+			cerr << "HW rendering in wireframe mode" << endl;
+		}
+		else {
+			cerr << "HW rendering in filled in mode" << endl;
+		}
+		break;
 	case 'n':
 	case 'N':
 		revolve_around_center = !revolve_around_center;
@@ -806,4 +814,29 @@ void FrameBuffer::draw_2d_mirrored_triangle(V3 V0, V3 V1, V3 V2, V3 N0, V3 N1, V
         }
         currEELS += b;
     }
+}
+
+
+unsigned int* FrameBuffer::get_vert_flipped_pixels() {
+	unsigned int* flippedPixels = new unsigned int[w * h];
+	for (int row = 0; row < h; row++) {
+		int src = row * w;
+		int dst = (h - 1 - row) * w;
+		for (int col = 0; col < w; col++) {
+			flippedPixels[dst + col] = pix[src + col];
+		}
+	}
+	return flippedPixels;
+}
+
+unsigned int* FrameBuffer::get_vert_and_horiz_flipped_pixels() {
+	unsigned int* flippedPixels = new unsigned int[w * h];
+	for (int row = 0; row < h; row++) {
+		int src = row * w;
+		int dst = (h - 1 - row) * w;
+		for (int col = 0; col < w; col++) {
+			flippedPixels[dst + (w - 1 - col)] = pix[src + col];
+		}
+	}
+	return flippedPixels;
 }

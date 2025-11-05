@@ -1,5 +1,6 @@
 #pragma once
 
+#include <GL/glew.h>
 #include <FL/Fl.H>
 #include <FL/Fl_Gl_Window.H>
 #include <GL/glut.h>
@@ -62,4 +63,7 @@ public:
 	void draw_2d_texture_triangle(V3 V0, V3 V1, V3 V2, V3 C0, V3 C1, V3 C2, bool mirror_tiling, FrameBuffer* tex);
 
 	void draw_2d_mirrored_triangle(V3 V0, V3 V1, V3 V2, V3 N0, V3 N1, V3 N2, PPC* ppc, CubeMap* cube_map);
+
+	unsigned int* get_vert_flipped_pixels(); //For HW texture use
+	unsigned int* get_vert_and_horiz_flipped_pixels(); //For HW Cube Map use
 };

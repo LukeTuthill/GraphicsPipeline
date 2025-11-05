@@ -9,11 +9,11 @@
 
 using namespace std;
 
-TM::TM(char* fname) {
+TM::TM(char* fname) : TM() {
 	load_bin(fname);
 }
 
-TM::TM(V3 center, float radius, float height, int _num_verts, unsigned int color) {
+TM::TM(V3 center, float radius, float height, int _num_verts, unsigned int color) : TM() {
 	num_verts = _num_verts - _num_verts % 2; //Ensures num_verts is even
 
 	int tris_per_circle = num_verts / 2 - 1;
@@ -78,7 +78,7 @@ TM::TM(V3 center, float radius, float height, int _num_verts, unsigned int color
 	}
 }
 
-TM::TM(V3 p1, V3 p2, unsigned int color) {
+TM::TM(V3 p1, V3 p2, unsigned int color) : TM(){
 	set_as_plane(p1, p2, color);
 }
 

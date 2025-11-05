@@ -11,6 +11,7 @@
     <ClCompile Include="TM.cpp" />
     <ClCompile Include="shadow_map.cpp" />
     <ClCompile Include="cube_map.cpp" />
+    <ClCompile Include="hw_framebuffer.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="framebuffer.h" />
@@ -23,6 +24,7 @@
     <ClInclude Include="tm.h" />
     <ClInclude Include="shadow_map.h" />
     <ClInclude Include="cube_map.h" />
+    <ClInclude Include="hw_framebuffer.h" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="CG">

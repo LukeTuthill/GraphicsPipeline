@@ -32,7 +32,9 @@ public:
 	V3* tcs; // texture coordinates per vertex
 	FrameBuffer* tex; // texture map
 
-	TM() : verts(0), projected_verts(0), num_verts(0), lighted_colors(0), colors(0), tris(0), num_tris(0), normals(0), tcs(0), tex(nullptr) {};
+	GLuint tex_id; // OpenGL texture ID
+
+	TM() : verts(0), projected_verts(0), num_verts(0), lighted_colors(0), colors(0), tris(0), num_tris(0), normals(0), tcs(0), tex(0) {};
 	TM(char* fname);
 
 	//Cylinder constructor

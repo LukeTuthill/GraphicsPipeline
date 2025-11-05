@@ -34,6 +34,10 @@ V3 PPC::get_vd() {
 	return (a ^ b).normalized();
 }
 
+float PPC::get_focal_length() {
+	return get_vd() * c;
+}
+
 int PPC::project(V3 P, V3& PP) {
 	int ret = 1;
 
@@ -128,6 +132,28 @@ void PPC::revolve_left_right(V3 center, float angle_degrees) {
 
 void PPC::revolve_up_down(V3 center, float angle_degrees) {
 	rotate_about_arbitrary_axis(center, -1 * a, angle_degrees);
+}
+
+void PPC::pose(V3 new_C, V3 look_at_point, V3 up_dir) {
+	V3 new_a, new_b, new_c;
+
+	V3 new_vd = (look_at_point - new_C).normalized();
+	new_a = (new_vd ^ up_dir).normalized();
+	new_b = (new_vd ^ new_a).normalized();
+	float f = get_focal_length();
+
+	new_c = new_vd * f - new_a * ((float)w / 2.0f) - new_b * ((float)h / 2.0f);
+
+	a = new_a;
+	b = new_b;
+	c = new_c;
+	C = new_C;
+
+	m.set_column(0, a);
+	m.set_column(1, b);
+	m.set_column(2, c);
+
+	m_inverted = m.inverted();
 }
 
 PPC PPC::interpolate(PPC* ppc2, float t) {

@@ -16,6 +16,7 @@ public:
 	int project(V3 P, V3& PP);
 	void translate(V3 tv);
 	V3 get_vd();
+	float get_focal_length();
 
 	void tilt(float angle_degrees); //rotate about a
 	void pan(float angle_degrees); //rotate about b
@@ -30,6 +31,8 @@ public:
 	void revolve_up_down(V3 center, float angle_degrees); //revolve around -a
 
 	void zoom(float s); //scale c by s, zoom in if s>0, out if s<0
+
+	void pose(V3 new_C, V3 look_at_point, V3 up_dir);
 
 	PPC interpolate(PPC* ppc2, float t); //t in [0,1]
 

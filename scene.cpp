@@ -15,27 +15,38 @@ Scene::Scene() {
 	int v0 = 40;
 	int h = 480;
 	int w = 640;
+
 	fb = new FrameBuffer(u0, v0, w, h);
 	fb->position(u0, v0);
 	fb->label("SW Framebuffer");
 	fb->show();
 	fb->redraw();
 
-	ppc = new PPC(60.0f, w, h); 
+	hw_fb = new HWFrameBuffer(u0, v0, w, h);
+	hw_fb->position(u0 + w + u0, v0);
+	hw_fb->label("HW Framebuffer");
+	hw_fb->show();
+	hw_fb->redraw();
+
+	ppc = new PPC(60.0f, w, h);
 	render_light = true;
 	ambient_factor = .4f;
 	specular_exp = 200;
 
 	num_tms = 1;
 	tms = new TM[num_tms];
-	tms[0] = TM("geometry/teapot57K.bin");
-	//tms[1] = TM("geometry/teapot57K.bin");
-	//tms[1].translate(V3(75.0f, 25.0f, 0.0f));
-	//tms[1].scale(0.5f);
-	//tms[1] = TM(V3(-100.0f, 0.0f, -100.0f), V3(100.0f, 0.0f, 100.0f), 0xFFFF00FF);
-	//tms[1].rotate_about_arbitrary_axis(tms[1].get_center(), V3(0.0f, 0.0f, 1.0f), 90.0f);
-	//tms[1].translate(V3(50.0f, 50.0f, 0.0f));
-	//tms[2] = TM(V3(-100.0f, 0.0f, -100.0f), V3(100.0f, 0.0f, 100.0f), 0xFF888888);
+	tms[0] = TM("geometry/teapot1K.bin");
+	if (num_tms > 1) {
+		tms[1] = TM("geometry/teapot57K.bin");
+		tms[1].translate(V3(75.0f, 25.0f, 0.0f));
+		tms[1].scale(0.5f);
+		tms[1] = TM(V3(-100.0f, 0.0f, -100.0f), V3(100.0f, 0.0f, 100.0f), 0xFFFF00FF);
+		tms[1].rotate_about_arbitrary_axis(tms[1].get_center(), V3(0.0f, 0.0f, 1.0f), 90.0f);
+		tms[1].translate(V3(50.0f, 50.0f, 0.0f));
+	}
+	if (num_tms > 2) {
+		tms[2] = TM(V3(-100.0f, 0.0f, -100.0f), V3(100.0f, 0.0f, 100.0f), 0xFF888888);
+	}
 
 	shadow_map = new ShadowMap(512, 512, V3());
 	cube_map = nullptr;
@@ -46,6 +57,12 @@ Scene::Scene() {
 	gui = new GUI();
 	gui->show();
 	gui->uiw->position(u0, v0 + fb->h + v0);
+
+	hw_fb->ppc = ppc;
+	hw_fb->tms = tms;
+	hw_fb->num_tms = num_tms;
+	hw_fb->set_shadow_map(*point_light, 512);
+
 }
 
 void Scene::render_cameras_as_frames() {
@@ -66,28 +83,33 @@ void Scene::render_cameras_as_frames() {
 	int frames_per_camera = num_frames / (num_ppcs - 1);
 	int frame_counter = 0;
 
-	// Create frames directory
-	system("mkdir frames");
-
 	render_type rt = render_type::NOT_LIGHTED;
+	bool save_to_file = false;
+
+	// Create frames directory
+	if (save_to_file)
+		system("mkdir frames");
+
+	PPC* scene_ppc = ppc; // Save original ppc
+
 	for (int p = 0; p < num_ppcs - 1; p++) {
 		PPC ppc_start = ppcs[p];
 		PPC ppc_end = ppcs[p + 1];
 		for (int f = 0; f < frames_per_camera; f++) {
 			float t = (float)f / (float)frames_per_camera;
 
-			fb->clear();
-			tm.rasterize(&ppc_start.interpolate(&ppc_end, t), fb, cube_map, rt);
-			fb->redraw();
+			ppc = &ppc_start.interpolate(&ppc_end, t);
+			render(rt);
 			
 			// Save frame to TIFF file
-			char filename[256];
-			sprintf_s(filename, "frames/frame_%03d.tiff", frame_counter++);
-			fb->save_as_tiff(filename);
-			
-			Fl::check();
+			if (save_to_file) {
+				char filename[256];
+				sprintf_s(filename, "frames/frame_%03d.tiff", frame_counter++);
+				fb->save_as_tiff(filename);
+			}
 		}
 	}
+	ppc = scene_ppc; // Restore original ppc
 }
 
 void Scene::render_shadows() {
@@ -97,6 +119,7 @@ void Scene::render_shadows() {
 	}
 }
 
+
 void Scene::render(render_type rt) {
 	fb->clear();
 
@@ -104,19 +127,30 @@ void Scene::render(render_type rt) {
 		render(tms[i], rt);
 	}
 
-	if (render_light)
+	if (render_light && rt == render_type::LIGHTED) {
 		fb->visualize_point_light(*point_light, ppc);
+		if (hw_fb) {
+			hw_fb->move_light(*point_light);
+		}
+	}
 
 	if (cube_map)
 		cube_map->render_as_environment(ppc, fb);
+
+	if (hw_fb) {
+		hw_fb->ppc = ppc;
+		hw_fb->render_wireframe = render_wireframe;
+		hw_fb->redraw();
+	}
 
 	fb->redraw();
 	Fl::check();
 }
 
 void Scene::render(TM& tm, render_type rt) {
-	if (render_light)
+	if (!tm.tex && render_light && rt == render_type::LIGHTED) {
 		tm.light_point(shadow_map, ppc->C, ambient_factor, specular_exp);
+	}
 	tm.rasterize(ppc, fb, cube_map, rt);
 }
 
@@ -130,54 +164,24 @@ void Scene::DBG() {
 		ppc->translate(V3(0.0f, 0.0f, 250.0f));
 		tms[0].position(V3(0.0f, 0.0f, 0.0f));
 		render_type rt = render_type::MIRROR_ONLY;
+
+		if (hw_fb) {
+			hw_fb->set_environment_map(cube_map);
+		}
+
 		while (true) {
 			render(rt);
 		}
 	}
 	case 4: { //Texture test
-		TM bricks_tm = TM();
-		bricks_tm.set_as_quad(V3(0.0f, 0.0f, 0.0f), V3(0.0f, 50.0f, 100.0f),
-			V3(100.0f, 50.0f, 0.0f), V3(100.0f, 0.0f, 100.0f), 0xFF000000);
-
-		FrameBuffer* bricks_tex = new FrameBuffer(0, 0, 100, 100);
-		bricks_tex->load_tiff("textures/bricks.tiff");
-		
-		TM flag_tm = TM();
-		flag_tm.set_as_quad(V3(0.0f, 0.0f, 0.0f), V3(0.0f, 50.0f, 100.0f),
-			V3(100.0f, 50.0f, 0.0f), V3(100.0f, 0.0f, 100.0f), 0xFF000000);
-
-		FrameBuffer* flag_tex = new FrameBuffer(0, 0, 100, 100);
-		flag_tex->load_tiff("textures/purdue.tiff");
-
-		TM face_tm = TM();
-		face_tm.set_as_quad(V3(0.0f, 0.0f, 0.0f), V3(0.0f, 50.0f, 100.0f),
-			V3(100.0f, 50.0f, 0.0f), V3(100.0f, 0.0f, 100.0f), 0xFF000000);
-
-		FrameBuffer* face_tex = new FrameBuffer(0, 0, 100, 100);
-		face_tex->load_tiff("textures/popescu.tiff");
-
-		TM box_tm = TM();
-		box_tm.set_as_quad(V3(0.0f, 0.0f, 0.0f), V3(0.0f, 50.0f, 100.0f),
-			V3(100.0f, 50.0f, 0.0f), V3(100.0f, 0.0f, 100.0f), 0xFF000000);
-
-		FrameBuffer* box_tex = new FrameBuffer(0, 0, 100, 100);
-		box_tex->load_tiff("textures/amazon.tiff");
-
-		V3 tiling_tcs[4] = {V3(0.0f, 0.0f, 0.0f), V3(0.0f, 4.0f, 0.0f), V3(4.0f, 0.0f, 0.0f), V3(4.0f, 4.0f, 0.0f)};
-		V3 tcs[4] = {V3(0.0f, 0.0f, 0.0f), V3(0.0f, 1.0f, 0.0f), V3(1.0f, 0.0f, 0.0f), V3(1.0f, 1.0f, 0.0f)};
-
-		bricks_tm.set_tex(bricks_tex, tiling_tcs);
-		flag_tm.set_tex(flag_tex, tcs);
-		face_tm.set_tex(face_tex, tiling_tcs);
-		box_tm.set_tex(box_tex, tcs);
-
-		ppc->translate(V3(0.0f, 50.0f, 250.0f));
-
-		flag_tm.translate(V3(-150.0f, 0.0f, 0.0f));
-		face_tm.translate(V3(0.0f, 150.0f, 0.0f));
-		box_tm.translate(V3(150.0f, 0.0f, 0.0f));
+		ppc->translate(V3(0.0f, 0.0f, 250.0f));
+		TM* texture_tms = make_texture_tms();
 
 		render_type rt = render_type::NORMAL_TILING_TEXTURED;
+
+		if (hw_fb) {
+			hw_fb->set_tms(texture_tms, 4);
+		}
 
 		while (true) {
 			fb->clear();
@@ -187,10 +191,15 @@ void Scene::DBG() {
 			else
 				rt = render_type::NORMAL_TILING_TEXTURED;
 
-			bricks_tm.rasterize(ppc, fb, cube_map, rt);
-			flag_tm.rasterize(ppc, fb, cube_map, rt);
-			face_tm.rasterize(ppc, fb, cube_map, rt);
-			box_tm.rasterize(ppc, fb, cube_map, rt);
+			if (hw_fb) {
+				hw_fb->render_wireframe = render_wireframe;
+				hw_fb->redraw();
+			}
+
+			texture_tms[0].rasterize(ppc, fb, cube_map, rt);
+			texture_tms[1].rasterize(ppc, fb, cube_map, rt);
+			texture_tms[2].rasterize(ppc, fb, cube_map, rt);
+			texture_tms[3].rasterize(ppc, fb, cube_map, rt);
 
 			fb->redraw();
 			Fl::check();
@@ -316,5 +325,56 @@ static void WriteName(int u, FrameBuffer *fb) {
 	fb->draw_line(u + 450, 100, u + 550, 100, 0xFF000000);
 	fb->draw_line(u + 450, 200, u + 525, 200, 0xFF000000);
 	fb->draw_line(u + 450, 300, u + 550, 300, 0xFF000000);
+}
+
+TM* make_texture_tms() {
+	TM bricks_tm = TM();
+	bricks_tm.set_as_quad(V3(0.0f, 0.0f, 0.0f), V3(0.0f, 50.0f, 100.0f),
+		V3(100.0f, 50.0f, 0.0f), V3(100.0f, 0.0f, 100.0f), 0xFF000000);
+
+	FrameBuffer* bricks_tex = new FrameBuffer(0, 0, 100, 100);
+	bricks_tex->load_tiff("textures/bricks.tiff");
+	
+	TM flag_tm = TM();
+	flag_tm.set_as_quad(V3(0.0f, 0.0f, 0.0f), V3(0.0f, 50.0f, 100.0f),
+		V3(100.0f, 50.0f, 0.0f), V3(100.0f, 0.0f, 100.0f), 0xFF000000);
+
+	FrameBuffer* flag_tex = new FrameBuffer(0, 0, 100, 100);
+	flag_tex->load_tiff("textures/purdue.tiff");
+
+	TM face_tm = TM();
+	face_tm.set_as_quad(V3(0.0f, 0.0f, 0.0f), V3(0.0f, 50.0f, 100.0f),
+		V3(100.0f, 50.0f, 0.0f), V3(100.0f, 0.0f, 100.0f), 0xFF000000);
+
+	FrameBuffer* face_tex = new FrameBuffer(0, 0, 100, 100);
+	face_tex->load_tiff("textures/popescu.tiff");
+
+	TM box_tm = TM();
+	box_tm.set_as_quad(V3(0.0f, 0.0f, 0.0f), V3(0.0f, 50.0f, 100.0f),
+		V3(100.0f, 50.0f, 0.0f), V3(100.0f, 0.0f, 100.0f), 0xFF000000);
+
+	FrameBuffer* box_tex = new FrameBuffer(0, 0, 100, 100);
+	box_tex->load_tiff("textures/amazon.tiff");
+
+	V3* tiling_tcs = new V3[4]{V3(0.0f, 0.0f, 0.0f), V3(0.0f, 4.0f, 0.0f), V3(4.0f, 0.0f, 0.0f), V3(4.0f, 4.0f, 0.0f)};
+	V3* tcs = new V3[4]{V3(0.0f, 0.0f, 0.0f), V3(0.0f, 1.0f, 0.0f), V3(1.0f, 0.0f, 0.0f), V3(1.0f, 1.0f, 0.0f)};
+
+	bricks_tm.set_tex(bricks_tex, tiling_tcs);
+	flag_tm.set_tex(flag_tex, tcs);
+	face_tm.set_tex(face_tex, tiling_tcs);
+	box_tm.set_tex(box_tex, tcs);
+
+	flag_tm.translate(V3(-150.0f, 0.0f, 0.0f));
+	face_tm.translate(V3(0.0f, 150.0f, 0.0f));
+	box_tm.translate(V3(150.0f, 0.0f, 0.0f));
+
+	TM* tms = new TM[4];
+
+	tms[0] = bricks_tm;
+	tms[1] = flag_tm;
+	tms[2] = face_tm;
+	tms[3] = box_tm;
+
+	return tms;
 }
 
