@@ -35,5 +35,6 @@
     <None Include="CG\shaderOne.cg">
       <Filter>CG</Filter>
     </None>
+    <None Include="hw" />
   </ItemGroup>
 </Project>

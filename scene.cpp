@@ -33,20 +33,20 @@ Scene::Scene() {
 	ambient_factor = .4f;
 	specular_exp = 200;
 
-	num_tms = 3;
+	num_tms = 2;
 	tms = new TM[num_tms];
 	tms[0] = TM("geometry/teapot1K.bin");
-	if (num_tms > 1) {
-		tms[1] = TM("geometry/teapot57K.bin");
-		tms[1].translate(V3(75.0f, 25.0f, 0.0f));
-		tms[1].scale(0.5f);
-		tms[1] = TM(V3(-100.0f, 0.0f, -100.0f), V3(100.0f, 0.0f, 100.0f), 0xFFFF00FF);
-		tms[1].rotate_about_arbitrary_axis(tms[1].get_center(), V3(0.0f, 0.0f, 1.0f), 90.0f);
-		tms[1].translate(V3(50.0f, 50.0f, 0.0f));
-	}
-	if (num_tms > 2) {
-		tms[2] = TM(V3(-100.0f, 0.0f, -100.0f), V3(100.0f, 0.0f, 100.0f), 0xFF888888);
-	}
+	//if (num_tms > 1) {
+	//	tms[1] = TM("geometry/teapot57K.bin");
+	//	tms[1].translate(V3(75.0f, 25.0f, 0.0f));
+	//	tms[1].scale(0.5f);
+	//	tms[1] = TM(V3(-100.0f, 0.0f, -100.0f), V3(100.0f, 0.0f, 100.0f), 0xFFFF00FF);
+	//	tms[1].rotate_about_arbitrary_axis(tms[1].get_center(), V3(0.0f, 0.0f, 1.0f), 90.0f);
+	//	tms[1].translate(V3(50.0f, 50.0f, 0.0f));
+	//}
+	//if (num_tms > 2) {
+	//	tms[2] = TM(V3(-100.0f, 0.0f, -100.0f), V3(100.0f, 0.0f, 100.0f), 0xFF888888);
+	//}
 
 	shadow_map = new ShadowMap(512, 512, V3());
 	cube_map = nullptr;
@@ -60,8 +60,8 @@ Scene::Scene() {
 
 	hw_fb->ppc = ppc;
 	hw_fb->set_tms(tms, num_tms);
-	hw_fb->set_shadow_map(*point_light, 512);
-	hw_fb->set_lighting(*point_light);
+	//hw_fb->set_shadow_map(*point_light, 512);
+	//hw_fb->set_lighting(*point_light);
 }
 
 void Scene::render_cameras_as_frames() {
@@ -78,7 +78,7 @@ void Scene::render_cameras_as_frames() {
 
 	TM tm("geometry/teapot1K.bin");
 
-	int num_frames = 300;
+	int num_frames = 1500;
 	int frames_per_camera = num_frames / (num_ppcs - 1);
 	int frame_counter = 0;
 
@@ -154,19 +154,39 @@ void Scene::render(TM& tm, render_type rt) {
 	if (!tm.tex && render_light && rt == render_type::LIGHTED) {
 		tm.light_point(shadow_map, ppc->C, ambient_factor, specular_exp);
 	}
-	tm.rasterize(ppc, fb, cube_map, rt);
+	if (tm.tex)
+		tm.rasterize(ppc, fb, cube_map, render_type::NORMAL_TILING_TEXTURED);
+	else
+		tm.rasterize(ppc, fb, cube_map, rt);
 }
 
 void Scene::DBG() {
 	cerr << endl;
-	int choice = 2;
+	int choice = 6;
 	
 	switch (choice) {
+	case 6: { //HW rendering only
+		ppc->translate(V3(0.0f, 0.0f, 300.0f));
+		TM* tex_tms = make_texture_tms();
+		tms[1] = tex_tms[1];
+		hw_fb->set_tms(tms, 2);
+
+		fb->hide();
+
+		while (true) {
+			hw_fb->ppc = ppc;
+			hw_fb->render_wireframe = render_wireframe;
+			hw_fb->redraw();
+			Fl::check();
+		}
+		return;
+	}
 	case 5: { //Environment cube map with reflective object test
 		cube_map = new CubeMap("textures/uffizi_cross.tiff");
 		ppc->translate(V3(0.0f, 0.0f, 250.0f));
 		tms[0].position(V3(0.0f, 0.0f, 0.0f));
 		render_type rt = render_type::MIRROR_ONLY;
+		render_light = false;
 
 		if (hw_fb) {
 			hw_fb->set_environment_map(cube_map);
@@ -185,6 +205,7 @@ void Scene::DBG() {
 
 		if (hw_fb) {
 			hw_fb->set_tms(texture_tms, 4);
+			hw_fb->use_lighting = false;
 		}
 
 		while (true) {
@@ -262,6 +283,10 @@ void Scene::DBG() {
 	case 0: { //Static render, loop allows camera movement
 		ppc->translate(V3(0.0f, 0.0f, 300.0f));
 		render_light = false;
+		TM* tex_tms = make_texture_tms();
+		tms[1] = tex_tms[1];
+		if (hw_fb)
+			hw_fb->set_tms(tms, 2);
 
 		render_type rt = render_type::NOT_LIGHTED;
 		while (true) {

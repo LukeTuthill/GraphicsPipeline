@@ -47,6 +47,8 @@ public:
 	void set_shadow_map(V3 light_pos, int shadow_map_size);
 	void set_environment_map(CubeMap* cube_map);
 
+	float* get_modelview_matrix(PPC* ppc);
+
 	void move_light(V3 new_pos);
 	
 	void draw() override;

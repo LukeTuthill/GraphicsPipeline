@@ -38,8 +38,8 @@ void HWFrameBuffer::init() {
 	//Only initialize textures and sets flag if there are any
 	init_textures();
 
-	if (shadows_enabled)
-		init_shadow_map();
+	//if (shadows_enabled)
+	//	init_shadow_map();
 
 	if (environment_map_enabled)
 		init_environment_map();
@@ -77,6 +77,8 @@ void HWFrameBuffer::init_lighting() {
 }
 
 void HWFrameBuffer::init_textures() {
+	glActiveTexture(GL_TEXTURE0);
+
 	for (int tmi = 0; tmi < num_tms; tmi++) {
 		TM* tm = &tms[tmi];
 
@@ -101,6 +103,7 @@ void HWFrameBuffer::init_textures() {
 
 		delete[](pixelData);
 	}
+	glDisable(GL_TEXTURE_2D);
 }
 
 void HWFrameBuffer::init_shadow_map() {
@@ -171,7 +174,8 @@ void HWFrameBuffer::init_environment_map() {
 			face->w, face->h, 0,
 			GL_RGBA, GL_UNSIGNED_BYTE, pixelData);
 
-		//delete[] pixelData;
+		if (i != 2 && i != 3)
+			delete[] pixelData;
 	}
 
 	// Set texture parameters
@@ -268,39 +272,47 @@ void HWFrameBuffer::draw() {
 		glLightfv(GL_LIGHT0, GL_POSITION, light_position);
 	}
 
-	if (shadows_enabled)
-		render_shadow_map();
+	/*if (shadows_enabled)
+		render_shadow_map();*/
 
-	// clear HW color and depth buffer
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+	glViewport(0, 0, w, h);
+
 	glClearColor(1.0f, 1.0f, 1.0f, 1.0f);
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-	if (environment_map_enabled)
-		render_environment_map();
 
-	if (shadows_enabled)
-		render_shadows();
+	/*if (shadows_enabled)
+		render_shadows();*/
 
 	// set the view
 	set_intrinsics(ppc);
 	set_extrinsics(ppc);
+
+	if (environment_map_enabled)
+		render_environment_map();
+
 
 	// iterate over all triangle meshes and draw current triangle mesh
 	for (int tmi = 0; tmi < num_tms; tmi++) {
 		render(&tms[tmi], tm_is_mirror[tmi]);
 	}
 
-	if (shadows_enabled) {
-		glDisable(GL_TEXTURE_GEN_S);
-		glDisable(GL_TEXTURE_GEN_T);
-		glDisable(GL_TEXTURE_GEN_R);
-		glDisable(GL_TEXTURE_GEN_Q);
-		glActiveTexture(GL_TEXTURE0);
-	}
+	//if (shadows_enabled) {
+	//	glDisable(GL_ALPHA_TEST);
+	//	glDisable(GL_TEXTURE_GEN_S);
+	//	glDisable(GL_TEXTURE_GEN_T);
+	//	glDisable(GL_TEXTURE_GEN_R);
+	//	glDisable(GL_TEXTURE_GEN_Q);
+	//	glActiveTexture(GL_TEXTURE7);
+	//	glDisable(GL_TEXTURE_2D);
+	//	glActiveTexture(GL_TEXTURE0);
+	//}
 
 	render_fps_counter();
 
-	visualize_point_light();
+	if (use_lighting)
+		visualize_point_light();
 }
 
 void HWFrameBuffer::render(TM* tm, bool is_mirror) {
@@ -330,6 +342,7 @@ void HWFrameBuffer::render(TM* tm, bool is_mirror) {
 	}
 	//Textured surface rendering
 	else if (has_textures && tm->tex) {
+		glActiveTexture(GL_TEXTURE0);
 		glEnable(GL_TEXTURE_2D);
 		glBindTexture(GL_TEXTURE_2D, tm->tex_id);
 		glEnableClientState(GL_TEXTURE_COORD_ARRAY);
@@ -343,7 +356,14 @@ void HWFrameBuffer::render(TM* tm, bool is_mirror) {
 
 	glDrawElements(GL_TRIANGLES, 3 * tm->num_tris, GL_UNSIGNED_INT, tm->tris);
 
-	if (has_textures && tm->tex) {
+	if (is_mirror && environment_map_enabled && env_cube_map_id != 0) {
+		glDisable(GL_TEXTURE_GEN_S);
+		glDisable(GL_TEXTURE_GEN_T);
+		glDisable(GL_TEXTURE_GEN_R);
+		glBindTexture(GL_TEXTURE_CUBE_MAP, 0);
+		glDisable(GL_TEXTURE_CUBE_MAP);
+	}
+	else if (has_textures && tm->tex) {
 		glDisableClientState(GL_TEXTURE_COORD_ARRAY);
 		glBindTexture(GL_TEXTURE_2D, 0); //Unbind texture
 		glDisable(GL_TEXTURE_2D);
@@ -390,25 +410,66 @@ void HWFrameBuffer::render_shadow_map() {
 }
 
 void HWFrameBuffer::render_shadows() {
-	// Get light's projection matrix
+	// Save current matrices
+	glMatrixMode(GL_PROJECTION);
+	glPushMatrix();
+	glMatrixMode(GL_MODELVIEW);
+	glPushMatrix();
+
+	// Set up texture matrix to transform from world space to light's clip space
 	glMatrixMode(GL_TEXTURE);
-	glActiveTexture(GL_TEXTURE7);  // Use texture unit 7 for shadow map
+	glActiveTexture(GL_TEXTURE7);
+	glEnable(GL_TEXTURE_2D);
 	glBindTexture(GL_TEXTURE_2D, shadow_map);
 
-	// Set up texture matrix for shadow coordinate generation
 	glLoadIdentity();
-	glTranslatef(0.5f, 0.5f, 0.5f);
+	glTranslatef(0.5f, 0.5f, 0.5f);  // Bias [-1,1] to [0,1]
 	glScalef(0.5f, 0.5f, 0.5f);
 
-	// Enable automatic texture coordinate generation
+	// Multiply by light's projection and modelview matrices
+	set_intrinsics(light_ppc);
+	glMultMatrixf(get_modelview_matrix(light_ppc));
+
+	// Enable automatic texture coordinate generation in object space
+	glTexGeni(GL_S, GL_TEXTURE_GEN_MODE, GL_OBJECT_LINEAR);
+	glTexGeni(GL_T, GL_TEXTURE_GEN_MODE, GL_OBJECT_LINEAR);
+	glTexGeni(GL_R, GL_TEXTURE_GEN_MODE, GL_OBJECT_LINEAR);
+	glTexGeni(GL_Q, GL_TEXTURE_GEN_MODE, GL_OBJECT_LINEAR);
+
+	// Use identity planes for object linear generation
+	// (the texture matrix does all the transformation)
+	float sPlane[4] = { 1.0f, 0.0f, 0.0f, 0.0f };
+	float tPlane[4] = { 0.0f, 1.0f, 0.0f, 0.0f };
+	float rPlane[4] = { 0.0f, 0.0f, 1.0f, 0.0f };
+	float qPlane[4] = { 0.0f, 0.0f, 0.0f, 1.0f };
+
+	glTexGenfv(GL_S, GL_OBJECT_PLANE, sPlane);
+	glTexGenfv(GL_T, GL_OBJECT_PLANE, tPlane);
+	glTexGenfv(GL_R, GL_OBJECT_PLANE, rPlane);
+	glTexGenfv(GL_Q, GL_OBJECT_PLANE, qPlane);
+
 	glEnable(GL_TEXTURE_GEN_S);
 	glEnable(GL_TEXTURE_GEN_T);
 	glEnable(GL_TEXTURE_GEN_R);
 	glEnable(GL_TEXTURE_GEN_Q);
-	glTexGeni(GL_S, GL_TEXTURE_GEN_MODE, GL_EYE_LINEAR);
-	glTexGeni(GL_T, GL_TEXTURE_GEN_MODE, GL_EYE_LINEAR);
-	glTexGeni(GL_R, GL_TEXTURE_GEN_MODE, GL_EYE_LINEAR);
-	glTexGeni(GL_Q, GL_TEXTURE_GEN_MODE, GL_EYE_LINEAR);
+
+	// Restore camera matrices for rendering
+	glMatrixMode(GL_PROJECTION);
+	glPopMatrix();
+	glMatrixMode(GL_MODELVIEW);
+	glPopMatrix();
+
+	// Set up shadow comparison
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_COMPARE_MODE, GL_COMPARE_R_TO_TEXTURE);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_COMPARE_FUNC, GL_LEQUAL);
+	glTexParameteri(GL_TEXTURE_2D, GL_DEPTH_TEXTURE_MODE, GL_INTENSITY);
+
+	// Use alpha test to create shadows
+	glEnable(GL_ALPHA_TEST);
+	glAlphaFunc(GL_GEQUAL, 0.99f);
+
+	// Modulate with lighting
+	glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE);
 
 	glMatrixMode(GL_MODELVIEW);
 }
@@ -418,26 +479,36 @@ void HWFrameBuffer::render_environment_map() {
 		return;
 
 	// Save current state
+	glMatrixMode(GL_PROJECTION);
+	glPushMatrix();
+	glMatrixMode(GL_MODELVIEW);
+	glPushMatrix();
 	glPushAttrib(GL_ALL_ATTRIB_BITS);
 
-	glViewport(0, 0, w, h);
-	
+	// Disable depth test and lighting
 	glDepthMask(GL_FALSE);
 	glDisable(GL_DEPTH_TEST);
 	glDisable(GL_LIGHTING);
+	glDisable(GL_LIGHT0);
+	glDisable(GL_COLOR_MATERIAL);
 
+	// Enable cube map texture
 	glEnable(GL_TEXTURE_CUBE_MAP);
 	glBindTexture(GL_TEXTURE_CUBE_MAP, env_cube_map_id);
 
+	// Set texture environment to replace mode (don't modulate with vertex color)
+	glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_REPLACE);
+
 	// Set up 2D orthographic projection for screen-space quad
 	glMatrixMode(GL_PROJECTION);
-	glPushMatrix();
 	glLoadIdentity();
 	gluOrtho2D(0, w, 0, h);
 
 	glMatrixMode(GL_MODELVIEW);
-	glPushMatrix();
 	glLoadIdentity();
+
+	// Set white color to avoid any color modulation
+	glColor3f(1.0f, 1.0f, 1.0f);
 
 	// Manually compute texture coordinates for each corner
 	// by calculating the view direction through that pixel
@@ -470,10 +541,15 @@ void HWFrameBuffer::render_environment_map() {
 
 	glEnd();
 
+	// Restore matrices
 	glPopMatrix();
 	glMatrixMode(GL_PROJECTION);
 	glPopMatrix();
 	glMatrixMode(GL_MODELVIEW);
+
+	// Unbind texture
+	glBindTexture(GL_TEXTURE_CUBE_MAP, 0);
+	glDisable(GL_TEXTURE_CUBE_MAP);
 
 	// Restore state
 	glPopAttrib();
@@ -516,12 +592,13 @@ void HWFrameBuffer::render_fps_counter() {
 		glPushMatrix();
 		glLoadIdentity();
 
+		glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 		// Draw background rectangle
 		glColor3f(0.0f, 0.0f, 0.0f);  // Black
 		glBegin(GL_QUADS);
 		glVertex2f(10, (GLfloat)h - 35);
-		glVertex2f(100, (GLfloat)h - 35);
-		glVertex2f(100, (GLfloat)h - 10);
+		glVertex2f(105, (GLfloat)h - 35);
+		glVertex2f(105, (GLfloat)h - 10);
 		glVertex2f(10, (GLfloat)h - 10);
 		glEnd();
 
@@ -544,4 +621,40 @@ void HWFrameBuffer::render_fps_counter() {
 		// Restore OpenGL state
 		glPopAttrib();
 	}
+}
+
+float* HWFrameBuffer::get_modelview_matrix(PPC* ppc) {
+	static float matrix[16];
+	
+	V3 C = ppc->C;
+	V3 vd = ppc->get_vd();
+	V3 up = -1 * ppc->b.normalized();
+	
+	// Compute camera basis vectors
+	V3 zaxis = (-1 * vd).normalized();  // Forward (negated view direction)
+	V3 xaxis = (up ^ zaxis).normalized();  // Right
+	V3 yaxis = zaxis ^ xaxis;            // Up
+	
+	// Build view matrix (column-major for OpenGL)
+	matrix[0] = xaxis[0];
+	matrix[1] = yaxis[0];
+	matrix[2] = zaxis[0];
+	matrix[3] = 0.0f;
+	
+	matrix[4] = xaxis[1];
+	matrix[5] = yaxis[1];
+	matrix[6] = zaxis[1];
+	matrix[7] = 0.0f;
+	
+	matrix[8] = xaxis[2];
+	matrix[9] = yaxis[2];
+	matrix[10] = zaxis[2];
+	matrix[11] = 0.0f;
+	
+	matrix[12] = -1 * xaxis * C;
+	matrix[13] = -1 * yaxis * C;
+	matrix[14] = -1 * zaxis * C;
+	matrix[15] = 1.0f;
+	
+	return matrix;
 }
