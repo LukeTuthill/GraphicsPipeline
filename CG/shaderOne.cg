@@ -8,8 +8,8 @@ struct VertexDataInput {
 
 struct VertexDataOutput {
 	float4 projv  : POSITION;
-	float3 normal : TEXCOORD0;
-	float3 xyz : TEXCOORD1;
+	float3 normal: TEXCOORD1;
+	float3 xyz: TEXCOORD2;
 	float3 color: COLOR;
 };
 
@@ -18,66 +18,103 @@ struct PixelDataOutput {
 };
 
 VertexDataOutput VertexMain(VertexDataInput vdi, 
-	uniform float4x4 modelViewProj, uniform float3 tmCenter,
-	float f, float R) {
+	uniform float4x4 modelViewProj, uniform float3 oCenter, 
+	uniform float sRadius, uniform float mFraction) {
 
   VertexDataOutput ret;
   float3 V0 = vdi.vertex.xyz;
-  float3 O = tmCenter;
-  float3 V1 = O + normalize(V0 - O)*R;
-  float4 morphedXYZ = float4(V0 + (V1-V0)*f, 1.0f);
-  ret.projv = mul(modelViewProj, morphedXYZ);
-//  ret.projv = mul(modelViewProj, vdi.vertex);
+  float3 d = normalize(V0 - oCenter);
+  float3 V1 = oCenter + d*sRadius;
+  float3 mV = V0 + (V1-V0)*mFraction;
+  ret.projv = mul(modelViewProj, float4(mV, 1.0f));
  
-  ret.normal = vdi.normal;
-  ret.xyz = vdi.vertex.xyz;
-  ret.color = vdi.color;
+//  ret.projv = mul(modelViewProj, vdi.vertex);
 
-//  ret.color = tmCenter + float3(.5f, .5f, 150.5f);
+  // pass through color
+  ret.color = vdi.color;
+  // pass throuh normal
+  ret.normal = vdi.normal;
+  // pass through world coordinates
+  ret.xyz = vdi.vertex.xyz;
 
   return ret;
 
 }
 
-// add uniform parameters for: 
-//		the ground billboard, 
-//		sampler2D for texture of ground billboard
-PixelDataOutput FragmentMain(VertexDataOutput pdi, uniform float3 eye, 
-	sampler2D tred, sampler2D tgreen, sampler2D tblue) {
+PixelDataOutput FragmentMain(VertexDataOutput pdi, uniform float3 eye,
+	uniform float3 billboards[6], uniform sampler2D billboardTextures[2],
+	uniform int numBillboards) {
 
+	PixelDataOutput ret;
+	ret.color = pdi.color;
+
+	// input: normal at current pixel, surface xyz at current pixel, user camera eye
+ 
+	// compute eye ray
+	float3 P = pdi.xyz;
+	float3 eyeRay = normalize(eye-P);
+
+	// reflect eye ray about normal to compute reflected ray
+	float3 rRay = reflect(eyeRay*-1.0f, pdi.normal);
+
+	float minDist = 1e10;
+	bool hit = false;
+	float4 hitColor;
+
+	for (int i = 0; i < numBillboards; i++) {
+		float3 V0 = billboards[i*3 + 0];
+		float3 V1 = billboards[i*3 + 1];
+		float3 V3 = billboards[i*3 + 2];
+
+		// compute billboard normal
+		float3 bbn = normalize(cross(V1-V0, V3-V0));
+
+		// intersect reflected ray with billboard plane
+		float t = dot(bbn, V0-P) / dot(rRay, bbn);
+		if (t < 0.0f || t > minDist) {
+		  continue;
+		}  
+
+		//The intersection will be closer if it does happen from previous t-check
+		float3 Q = P + rRay*t;
+		float3 ax = normalize(V3-V0);
+		float qax = dot(Q-V0, ax);
+
+		float3 ay = normalize(V1-V0);
+		float qay = dot(Q-V0, ay);
+
+		if ((qax < 0.0f) || (qax > length(V3-V0)) || 
+			(qay < 0.0f) || (qay > length(V1-V0))) {
+			continue;
+		}
+
+		//Check for transparent background in texture
+		float2 texCoords = float2(qax/length(V3-V0), qay/length(V1-V0));
+		float4 texColor = tex2D(billboardTextures[i], texCoords);
+		if (texColor.a < 0.1f) {
+			continue;
+		}
+
+		//Successful intersection
+		hit = true;
+		minDist = t;
+		hitColor = texColor;
+	}
+
+	if (hit) {
+		// sample texture at hitCoords
+		ret.color = (pdi.color + hitColor.xyz) / 2.0f;
+	}
+
+	// return color of closest intersection or original color if no intersection
+	return ret;
+}
+
+
+PixelDataOutput FragmentMainDefault(VertexDataOutput pdi, uniform float3 eye) {
   PixelDataOutput ret;
-
   ret.color = pdi.color;
-
-//  ret.color.r = pdi.xyz.x / 128.0f + 0.5f;
-//  ret.color.g = pdi.xyz.y / 128.0f + 0.5f;
-//  ret.color.b = (pdi.xyz.z+150.0f) / 128.0f + 0.5f;
-
-
-//  ret.color.rgb = (pdi.normal+float3(1.0f, 1.0f, 1.0f))/2.0f;
-
-//ret.color.rgb = eye;
-
-  float3 eyeRay = normalize(pdi.xyz-eye);
-//  ret.color.rgb = (eyeRay + float3(1.0f, 1.0f, 1.0f))/2.0f;
-
-  float3 rRay = reflect(eyeRay, pdi.normal);
-//  ret.color.rgb = (rRay + float3(1.0f, 1.0f, 1.0f))/2.0f;
-
-  if (pdi.xyz.x < 0.0f)
-	ret.color.rgb = tex2D(tred, float2(0.5f, 0.5f)).rgb;
-  else if (pdi.xyz.y < 0.0f)
-	ret.color.rgb = tex2D(tgreen, float2(0.5f, 0.5f)).rgb;
-  else
-	ret.color.rgb = tex2D(tblue, float2(0.5f, 0.5f)).rgb;
-
-
-  // compute intersection between ground billboard and reflected ray
-  // I = pdi.xyz + rRay*t // equation 1 of ray plane intersection system of 2 equations
-  // (I-A)*n = 0 // equation 2 of ray plane intersection system of 2 equations
-  // if no intersection, then no reflection, return color as usual
-  // if yes intersection, lookup ground billboard color at intersection point
-
+  ret.color = pdi.normal;
   return ret;
 
 }

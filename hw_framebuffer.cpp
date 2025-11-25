@@ -13,7 +13,7 @@ HWFrameBuffer::HWFrameBuffer(int u0, int v0, int _w, int _h) : FrameBuffer(u0, v
 	ppc = nullptr;
 	tms = nullptr;
 	num_tms = 0;
-	tm_is_mirror = nullptr;
+	tm_is_reflector = nullptr;
 
 	shadow_fb = 0;
 	shadow_map = 0;
@@ -29,6 +29,19 @@ HWFrameBuffer::HWFrameBuffer(int u0, int v0, int _w, int _h) : FrameBuffer(u0, v
 	environment_map_enabled = false;
 
 	last_frame_time = std::chrono::steady_clock::now();
+
+	cgi = 0;
+	soi = 0;
+
+	num_billboards = 0;
+	billboards = std::vector<Billboard>();
+	billboard_vertices = nullptr;
+	billboard_texture_ids = nullptr;
+	billboard_texture_size = 512;  // Default texture resolution
+	billboards_initialized = false;
+
+	ground_plane_tm_indices = std::vector<int>();;
+	regular_billboard_tm_indices = std::vector<int>();
 }
 
 void HWFrameBuffer::init() {
@@ -40,6 +53,12 @@ void HWFrameBuffer::init() {
 
 	//if (shadows_enabled)
 	//	init_shadow_map();
+
+	cgi = new CGInterface();
+	cgi->PerSessionInit();
+
+	soi = new ShaderOneInterface();
+	soi->PerSessionInit(cgi);
 
 	if (environment_map_enabled)
 		init_environment_map();
@@ -191,9 +210,13 @@ void HWFrameBuffer::init_environment_map() {
 void HWFrameBuffer::set_tms(TM* tms, int num_tms) {
 	this->tms = tms;
 	this->num_tms = num_tms;
-	if (tm_is_mirror)
-		delete[] tm_is_mirror;
-	tm_is_mirror = new bool[num_tms];
+
+	if (tm_is_reflector)
+		delete[] tm_is_reflector;
+
+	tm_is_reflector = new bool[num_tms];
+	for (int i = 0; i < num_tms; i++)
+		tm_is_reflector[i] = false;
 
 	initialized = false;
 }
@@ -266,6 +289,9 @@ void HWFrameBuffer::draw() {
 	if (!initialized)
 		init();
 
+	if (!billboards_initialized)
+		init_billboards();
+
 	if (use_lighting) {
 		// Update light position
 		GLfloat light_position[] = { light_pos[0], light_pos[1], light_pos[2], 1.0f };
@@ -292,10 +318,20 @@ void HWFrameBuffer::draw() {
 	if (environment_map_enabled)
 		render_environment_map();
 
-
 	// iterate over all triangle meshes and draw current triangle mesh
 	for (int tmi = 0; tmi < num_tms; tmi++) {
-		render(&tms[tmi], tm_is_mirror[tmi]);
+		if (tm_is_reflector[tmi]) {
+			cgi->EnableProfiles();
+			soi->PerFrameInit();
+			soi->BindPrograms();
+
+			render(&tms[tmi], tm_is_reflector[tmi]);
+
+			cgi->DisableProfiles();
+			soi->PerFrameDisable();
+			continue;
+		}
+		render(&tms[tmi], tm_is_reflector[tmi]);
 	}
 
 	//if (shadows_enabled) {
@@ -309,10 +345,12 @@ void HWFrameBuffer::draw() {
 	//	glActiveTexture(GL_TEXTURE0);
 	//}
 
+
 	render_fps_counter();
 
 	if (use_lighting)
 		visualize_point_light();
+
 }
 
 void HWFrameBuffer::render(TM* tm, bool is_mirror) {
@@ -657,4 +695,268 @@ float* HWFrameBuffer::get_modelview_matrix(PPC* ppc) {
 	matrix[15] = 1.0f;
 	
 	return matrix;
+}
+
+void HWFrameBuffer::clear_billboards() {
+	if (billboard_vertices) {
+		delete[] billboard_vertices;
+		billboard_vertices = nullptr;
+	}
+	if (billboard_texture_ids) {
+		glDeleteTextures(num_billboards, billboard_texture_ids);
+		delete[] billboard_texture_ids;
+		billboard_texture_ids = nullptr;
+	}
+	billboards.clear();
+	num_billboards = 0;
+}
+
+GLuint HWFrameBuffer::render_tm_to_texture(int tm_index, int texture_size) {
+	if (tm_index < 0 || tm_index >= num_tms) {
+		cerr << "ERROR: Invalid tm_index " << tm_index << endl;
+		return 0;
+	}
+
+	TM* tm = &tms[tm_index];
+
+	// Create framebuffer for offscreen rendering
+	GLuint fbo;
+	glGenFramebuffers(1, &fbo);
+	glBindFramebuffer(GL_FRAMEBUFFER, fbo);
+
+	// Create texture for color attachment
+	GLuint texture_id;
+	glGenTextures(1, &texture_id);
+	glBindTexture(GL_TEXTURE_2D, texture_id);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, texture_size, texture_size,
+		0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+
+	// Attach texture to framebuffer
+	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, texture_id, 0);
+
+	// Create renderbuffer for depth attachment
+	GLuint depth_rb;
+	glGenRenderbuffers(1, &depth_rb);
+	glBindRenderbuffer(GL_RENDERBUFFER, depth_rb);
+	glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT, texture_size, texture_size);
+	glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, depth_rb);
+
+	// Check framebuffer status
+	if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
+		cerr << "ERROR: Framebuffer incomplete!" << endl;
+		glBindFramebuffer(GL_FRAMEBUFFER, 0);
+		glDeleteTextures(1, &texture_id);
+		glDeleteRenderbuffers(1, &depth_rb);
+		glDeleteFramebuffers(1, &fbo);
+		return 0;
+	}
+
+	// Set viewport for texture rendering
+	glViewport(0, 0, texture_size, texture_size);
+
+	// Clear with transparent background
+	glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
+	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+	// Enable alpha blending for transparency
+	glEnable(GL_BLEND);
+	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+	// Set up camera to view the object
+	
+	PPC temp_ppc(60.0f, texture_size, texture_size);
+	V3 camera_pos = tms[0].get_center();
+	V3 tm_center = tm->get_center();
+	temp_ppc.pose(camera_pos, tm_center, V3(0.0f, 1.0f, 0.0f));
+
+	// Set camera matrices
+	set_intrinsics(&temp_ppc);
+	set_extrinsics(&temp_ppc);
+
+	// Render the triangle mesh
+	bool saved_wireframe = render_wireframe;
+	render_wireframe = false;  // Force solid rendering
+	render(tm, false);
+	render_wireframe = saved_wireframe;
+
+	// Restore viewport
+	glViewport(0, 0, w, h);
+
+	// Unbind framebuffer
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+	// Clean up framebuffer and renderbuffer
+	glDeleteRenderbuffers(1, &depth_rb);
+	glDeleteFramebuffers(1, &fbo);
+
+	glDisable(GL_BLEND);
+
+	cerr << "INFO: Rendered TM " << tm_index << " to texture ID " << texture_id << endl;
+
+	return texture_id;
+}
+
+GLuint HWFrameBuffer::create_solid_color_texture(V3 color_vec, int texture_size) {
+	unsigned int color = color_vec.convert_to_color_int();
+
+	// Create pixel data array filled with the solid color
+	int num_pixels = texture_size * texture_size;
+	unsigned int* pixel_data = new unsigned int[num_pixels];
+
+	for (int i = 0; i < num_pixels; i++) {
+		pixel_data[i] = color;
+	}
+
+	// Create OpenGL texture
+	GLuint texture_id;
+	glGenTextures(1, &texture_id);
+	glBindTexture(GL_TEXTURE_2D, texture_id);
+
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, texture_size, texture_size,
+		0, GL_RGBA, GL_UNSIGNED_BYTE, pixel_data);
+
+	glBindTexture(GL_TEXTURE_2D, 0); // Unbind
+
+	delete[] pixel_data;
+
+	return texture_id;
+}
+
+void HWFrameBuffer::create_ground_plane_billboard(int tm_index) {
+	if (tm_index < 0 || tm_index >= num_tms) {
+		cerr << "ERROR: Invalid tm_index " << tm_index << endl;
+		return;
+	}
+
+	ground_plane_tm_indices.push_back(tm_index);
+	billboards_initialized = false;
+	num_billboards++;
+}
+
+void HWFrameBuffer::init_ground_plane_billboard(int tm_index) {
+	TM* tm = &tms[tm_index];
+
+	GLuint texture_id = create_solid_color_texture(tm->colors[0], 1);
+	if (texture_id == 0) {
+		cerr << "ERROR: Failed to create texture for ground plane billboard" << endl;
+		return;
+	}
+
+	cerr << "INFO: Created ground plane billboard for TM " << tm_index 
+		<< " with texture ID " << texture_id << endl;
+
+	// Create billboard structure
+	Billboard new_billboard;
+
+	new_billboard.V0 = tm->verts[0];
+	new_billboard.V1 = tm->verts[1];
+	new_billboard.V3 = tm->verts[3];
+	new_billboard.texture_id = texture_id;
+
+	// Expand billboard array
+	billboards.push_back(new_billboard);
+}
+
+void HWFrameBuffer::create_billboard_from_tm(int tm_index) {
+	if (tm_index < 0 || tm_index >= num_tms) {
+		cerr << "ERROR: Invalid tm_index " << tm_index << endl;
+		return;
+	}
+
+	regular_billboard_tm_indices.push_back(tm_index);
+	billboards_initialized = false;
+	num_billboards++;
+}
+
+void HWFrameBuffer::init_billboard_from_tm(int tm_index) {
+
+	// Render the triangle mesh to a texture
+	GLuint texture_id = render_tm_to_texture(tm_index, billboard_texture_size);
+	if (texture_id == 0) {
+		cerr << "ERROR: Failed to create texture for billboard" << endl;
+		return;
+	}
+
+	TM* tm = &tms[tm_index];
+
+	// Create billboard structure
+	Billboard new_billboard;
+
+	// Position billboard at the center of the tm
+	V3 billboard_center = tm->get_center();
+
+	// Calculate normal vector pointing from billboard towards tms[0]
+	V3 normal = (billboard_center - tms[0].get_center()).normalized();
+	
+	// Choose an arbitrary up vector (not parallel to normal)
+	V3 up = V3(0.0f, 1.0f, 0.0f);
+	if (fabs(normal * up) > 0.9f) {
+		up = V3(1.0f, 0.0f, 0.0f);
+	}
+	
+	// Compute right and actual up vectors for billboard
+	V3 right = (normal ^ up).normalized();
+	up = (right ^ normal).normalized();
+
+	// Get bounding box to determine billboard size
+	V3 bbox_min, bbox_max;
+	tm->get_bounding_box(bbox_min, bbox_max);
+	float billboard_width = (bbox_max - bbox_min).length();
+	float billboard_height = billboard_width;  // Square billboard
+
+	// Calculate corner positions
+	V3 half_right = right * (billboard_width / 2.0f);
+	V3 half_up = up * (billboard_height / 2.0f);
+
+	//Corners seem wrong because image was rotated 90 degrees when rendered
+	new_billboard.V0 = billboard_center - half_right - half_up;  // Bottom-left
+	new_billboard.V1 = billboard_center - half_right + half_up;  // Bottom-right
+	new_billboard.V3 = billboard_center + half_right - half_up;  // Top-left
+	new_billboard.texture_id = texture_id;
+
+	billboards.push_back(new_billboard);
+
+	cerr << "INFO: Created billboard from TM " << tm_index 
+		<< " at " << billboard_center << " facing towards TM 0"
+		<< " (size: " << billboard_width << ")" << endl;
+}
+
+void HWFrameBuffer::init_billboards() {
+	if (num_billboards == 0) return;
+
+	// Clean up old arrays (but not textures)
+	if (billboard_vertices) delete[] billboard_vertices;
+	if (billboard_texture_ids) delete[] billboard_texture_ids;
+
+	for (int tm_index : ground_plane_tm_indices) {
+		init_ground_plane_billboard(tm_index);
+	}
+
+	for (int tm_index : regular_billboard_tm_indices) {
+		init_billboard_from_tm(tm_index);
+	}
+
+	// Allocate new arrays
+	billboard_vertices = new V3[num_billboards * 3];  // V0, V1, V3 per billboard
+	billboard_texture_ids = new GLuint[num_billboards];
+
+	// Fill arrays - texture index is implicit (same as billboard index)
+	for (int i = 0; i < num_billboards; i++) {
+		billboard_vertices[i * 3 + 0] = billboards[i].V0;
+		billboard_vertices[i * 3 + 1] = billboards[i].V1;
+		billboard_vertices[i * 3 + 2] = billboards[i].V3;
+		billboard_texture_ids[i] = billboards[i].texture_id;
+	}
+
+	billboards_initialized = true;
+	cerr << "INFO: Initialized " << num_billboards << " billboards for shader (sequential texture indexing)" << endl;
 }

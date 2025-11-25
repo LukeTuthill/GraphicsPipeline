@@ -33,20 +33,22 @@ Scene::Scene() {
 	ambient_factor = .4f;
 	specular_exp = 200;
 
-	num_tms = 2;
+	num_tms = 3;
 	tms = new TM[num_tms];
 	tms[0] = TM("geometry/teapot1K.bin");
-	//if (num_tms > 1) {
-	//	tms[1] = TM("geometry/teapot57K.bin");
-	//	tms[1].translate(V3(75.0f, 25.0f, 0.0f));
-	//	tms[1].scale(0.5f);
-	//	tms[1] = TM(V3(-100.0f, 0.0f, -100.0f), V3(100.0f, 0.0f, 100.0f), 0xFFFF00FF);
-	//	tms[1].rotate_about_arbitrary_axis(tms[1].get_center(), V3(0.0f, 0.0f, 1.0f), 90.0f);
-	//	tms[1].translate(V3(50.0f, 50.0f, 0.0f));
-	//}
-	//if (num_tms > 2) {
-	//	tms[2] = TM(V3(-100.0f, 0.0f, -100.0f), V3(100.0f, 0.0f, 100.0f), 0xFF888888);
-	//}
+	if (num_tms > 1) {
+		tms[1] = TM();
+		tms[1].set_as_quad(V3(-100.0f, 0.0f, -100.0f),
+			V3(-100.0f, 0.0f, 100.0f),
+			V3(100.0f, 0.0f, -100.0f),
+			V3(100.0f, 0.0f, 100.0f),
+			0xFF0000FF);
+	}
+	if (num_tms > 2) {
+		tms[2] = make_texture_tms()[1];
+		tms[2].position(V3(0.0f, 30.0f, 100.0f));
+		tms[2].scale(.75f);
+	}
 
 	shadow_map = new ShadowMap(512, 512, V3());
 	cube_map = nullptr;
@@ -162,9 +164,25 @@ void Scene::render(TM& tm, render_type rt) {
 
 void Scene::DBG() {
 	cerr << endl;
-	int choice = 6;
+	int choice = 7;
 	
 	switch (choice) {
+	case 7: { //HW Rendering for billboard imposter
+		ppc->translate(V3(0.0f, 75.0f, 300.0f));
+		fb->hide();
+
+		hw_fb->tm_is_reflector[0] = true;
+		
+		hw_fb->create_ground_plane_billboard(1);
+		hw_fb->create_billboard_from_tm(2);
+	
+		while (true) {
+			hw_fb->ppc = ppc;
+			hw_fb->redraw();
+			Fl::check();
+		}
+		return;
+	}
 	case 6: { //HW rendering only
 		ppc->translate(V3(0.0f, 0.0f, 300.0f));
 		TM* tex_tms = make_texture_tms();
@@ -190,7 +208,7 @@ void Scene::DBG() {
 
 		if (hw_fb) {
 			hw_fb->set_environment_map(cube_map);
-			hw_fb->tm_is_mirror[0] = true;
+			hw_fb->tm_is_reflector[0] = true;
 		}
 
 		while (true) {
@@ -281,12 +299,8 @@ void Scene::DBG() {
 		return;
 	}
 	case 0: { //Static render, loop allows camera movement
-		ppc->translate(V3(0.0f, 0.0f, 300.0f));
+		ppc->translate(V3(0.0f, 75.0f, 300.0f));
 		render_light = false;
-		TM* tex_tms = make_texture_tms();
-		tms[1] = tex_tms[1];
-		if (hw_fb)
-			hw_fb->set_tms(tms, 2);
 
 		render_type rt = render_type::NOT_LIGHTED;
 		while (true) {

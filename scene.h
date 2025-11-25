@@ -31,6 +31,8 @@ public:
 
 	std::chrono::steady_clock::time_point last_frame_time;
 
+	float mFraction = 0.0f;
+
 	Scene();
 	void DBG();
 	void NewButton();
