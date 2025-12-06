@@ -1,3 +1,5 @@
+
+
 struct VertexDataInput {
 	float4 vertex: POSITION;
 	float3 normal: NORMAL;
@@ -57,82 +59,46 @@ PixelDataOutput FragmentMain(VertexDataOutput pdi, uniform float3 eye,
 
 	float minDist = 1e10;
 	bool hit = false;
-	float4 hitColor = float4(0.0f, 0.0f, 0.0f, 0.0f);
+	float4 hitColor;
 
-	// MANUALLY UNROLLED LOOP - Billboard 0
-	if (numBillboards > 0) {
-		float3 V0 = billboards[0];
-		float3 V1 = billboards[1];
-		float3 V3 = billboards[2];
-
-		// compute billboard normal
-		float3 bbn = normalize(cross(V1-V0, V3-V0));
-
-		// intersect reflected ray with billboard plane
-		float t = dot(bbn, V0-P) / dot(rRay, bbn);
-		
-		if (t >= 0.0f && t <= minDist) {
-			//The intersection will be closer if it does happen from previous t-check
-			float3 Q = P + rRay*t;
-			float3 ax = normalize(V3-V0);
-			float qax = dot(Q-V0, ax);
-
-			float3 ay = normalize(V1-V0);
-			float qay = dot(Q-V0, ay);
-
-			if ((qax >= 0.0f) && (qax <= length(V3-V0)) && 
-				(qay >= 0.0f) && (qay <= length(V1-V0))) {
-				
-				//Check for transparent background in texture
-				float2 texCoords = float2(qax/length(V3-V0), qay/length(V1-V0));
-				float4 texColor = tex2D(billboardTextures[0], texCoords);
-				
-				if (texColor.a >= 0.1f) {
-					//Successful intersection
-					hit = true;
-					minDist = t;
-					hitColor = texColor;
-				}
-			}
-		}
-	}
-
-	// MANUALLY UNROLLED LOOP - Billboard 1
-	if (numBillboards > 1) {
-		float3 V0 = billboards[3];
-		float3 V1 = billboards[4];
-		float3 V3 = billboards[5];
+	for (int i = 0; i < numBillboards; i++) {
+		float3 V0 = billboards[i*3 + 0];
+		float3 V1 = billboards[i*3 + 1];
+		float3 V3 = billboards[i*3 + 2];
 
 		// compute billboard normal
 		float3 bbn = normalize(cross(V1-V0, V3-V0));
 
 		// intersect reflected ray with billboard plane
 		float t = dot(bbn, V0-P) / dot(rRay, bbn);
-		
-		if (t >= 0.0f && t <= minDist) {
-			//The intersection will be closer if it does happen from previous t-check
-			float3 Q = P + rRay*t;
-			float3 ax = normalize(V3-V0);
-			float qax = dot(Q-V0, ax);
+		if (t < 0.0f || t > minDist) {
+		  continue;
+		}  
 
-			float3 ay = normalize(V1-V0);
-			float qay = dot(Q-V0, ay);
+		//The intersection will be closer if it does happen from previous t-check
+		float3 Q = P + rRay*t;
+		float3 ax = normalize(V3-V0);
+		float qax = dot(Q-V0, ax);
 
-			if ((qax >= 0.0f) && (qax <= length(V3-V0)) && 
-				(qay >= 0.0f) && (qay <= length(V1-V0))) {
-				
-				//Check for transparent background in texture
-				float2 texCoords = float2(qax/length(V3-V0), qay/length(V1-V0));
-				float4 texColor = tex2D(billboardTextures[1], texCoords);
-				
-				if (texColor.a >= 0.1f) {
-					//Successful intersection
-					hit = true;
-					minDist = t;
-					hitColor = texColor;
-				}
-			}
+		float3 ay = normalize(V1-V0);
+		float qay = dot(Q-V0, ay);
+
+		if ((qax < 0.0f) || (qax > length(V3-V0)) || 
+			(qay < 0.0f) || (qay > length(V1-V0))) {
+			continue;
 		}
+
+		//Check for transparent background in texture
+		float2 texCoords = float2(qax/length(V3-V0), qay/length(V1-V0));
+		float4 texColor = tex2D(billboardTextures[i], texCoords);
+		if (texColor.a < 0.1f) {
+			continue;
+		}
+
+		//Successful intersection
+		hit = true;
+		minDist = t;
+		hitColor = texColor;
 	}
 
 	if (hit) {
@@ -152,3 +118,4 @@ PixelDataOutput FragmentMainDefault(VertexDataOutput pdi, uniform float3 eye) {
   return ret;
 
 }
+

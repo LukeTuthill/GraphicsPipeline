@@ -5,6 +5,7 @@
 #include "ppc.h"
 #include "tm.h"
 #include "pong.h"
+#include "tetris.h"
 #include "hw_framebuffer.h"
 
 class Scene {
@@ -28,6 +29,7 @@ public:
 
 	bool pong = false;
 	PongGame* pong_game;
+	Tetris* tetris_game;
 
 	std::chrono::steady_clock::time_point last_frame_time;
 

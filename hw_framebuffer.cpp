@@ -940,10 +940,12 @@ void HWFrameBuffer::init_billboards() {
 	for (int tm_index : ground_plane_tm_indices) {
 		init_ground_plane_billboard(tm_index);
 	}
+	ground_plane_tm_indices.clear();
 
 	for (int tm_index : regular_billboard_tm_indices) {
 		init_billboard_from_tm(tm_index);
 	}
+	regular_billboard_tm_indices.clear();
 
 	// Allocate new arrays
 	billboard_vertices = new V3[num_billboards * 3];  // V0, V1, V3 per billboard

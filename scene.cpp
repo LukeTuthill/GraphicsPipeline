@@ -27,6 +27,7 @@ Scene::Scene() {
 	hw_fb->label("HW Framebuffer");
 	hw_fb->show();
 	hw_fb->redraw();
+	hw_fb->hide();
 
 	ppc = new PPC(60.0f, w, h);
 	render_light = true;
@@ -55,6 +56,7 @@ Scene::Scene() {
 	point_light = new V3();
 
 	pong_game = nullptr;
+	tetris_game = new Tetris(fb);
 
 	gui = new GUI();
 	gui->show();
@@ -164,9 +166,17 @@ void Scene::render(TM& tm, render_type rt) {
 
 void Scene::DBG() {
 	cerr << endl;
-	int choice = 7;
+	int choice = 8;
 	
 	switch (choice) {
+	case 8: { //Tetris Game
+		fb->clear();
+		while (true) {
+			tetris_game->game_loop();
+			fb->redraw();
+			Fl::check();
+		}
+	}
 	case 7: { //HW Rendering for billboard imposter
 		ppc->translate(V3(0.0f, 75.0f, 300.0f));
 		fb->hide();

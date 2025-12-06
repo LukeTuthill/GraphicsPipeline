@@ -76,6 +76,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClInclude Include="CGInterface.h" />
     <ClInclude Include="cube_map.h" />
     <ClInclude Include="framebuffer.h" />
     <ClInclude Include="gui.h" />
@@ -85,10 +86,12 @@
     <ClInclude Include="ppc.h" />
     <ClInclude Include="scene.h" />
     <ClInclude Include="shadow_map.h" />
+    <ClInclude Include="tetris.h" />
     <ClInclude Include="tm.h" />
     <ClInclude Include="v3.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="CGInterface.cpp" />
     <ClCompile Include="cube_map.cpp" />
     <ClCompile Include="framebuffer.cpp" />
     <ClCompile Include="gui.cxx" />
@@ -98,11 +101,13 @@
     <ClCompile Include="ppc.cpp" />
     <ClCompile Include="scene.cpp" />
     <ClCompile Include="shadow_map.cpp" />
+    <ClCompile Include="tetris.cpp" />
     <ClCompile Include="TM.cpp" />
     <ClCompile Include="V3.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <None Include="CG\shaderOne.cg" />
+    <None Include="cg CG\shaderOne.cg" />
+    <None Include="CG\ShaderWithLoops.cg" />
     <None Include="hw" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

@@ -21,8 +21,7 @@ FrameBuffer::FrameBuffer(int u0, int v0, int _w, int _h) :
 	zb = new float[w*h];
 	move_light = false;
 	revolve_around_center = false;
-
-	}
+}
 
 void FrameBuffer::draw() {
 	glDrawPixels(w, h, GL_RGBA, GL_UNSIGNED_BYTE, pix);
@@ -55,6 +54,43 @@ void FrameBuffer::KeyboardHandle() {
 	if (!scene->ppc) return;
 	float move_constant = 5.0f;
 	float rotation_constant = 2.0f;
+
+	if (scene->tetris_game) {
+		switch (key) {
+		case 'r':
+		case 'R':
+		case '/': {
+			scene->tetris_game->set_move(3);
+			break;
+		}
+		case 'f':
+		case 'F': {
+			scene->tetris_game->set_move(4);
+			break;
+		}
+		case 's':
+		case 'S':
+		case FL_Down: {
+			scene->tetris_game->set_move(5);
+			break;
+		}
+		case 'a':
+		case 'A':
+		case FL_Left: {
+			scene->tetris_game->set_move(1);
+			break;
+		}
+		case 'd':
+		case 'D':
+		case FL_Right: {
+			scene->tetris_game->set_move(2);
+			break;
+		}
+		default:
+			cerr << "INFO: do not understand keypress" << endl;
+		}
+		return;
+	}
 
 	if (scene->pong) {
 		switch (key) {

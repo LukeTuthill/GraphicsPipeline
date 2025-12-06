@@ -12,6 +12,8 @@
     <ClCompile Include="shadow_map.cpp" />
     <ClCompile Include="cube_map.cpp" />
     <ClCompile Include="hw_framebuffer.cpp" />
+    <ClCompile Include="CGInterface.cpp" />
+    <ClCompile Include="tetris.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="framebuffer.h" />
@@ -25,6 +27,8 @@
     <ClInclude Include="shadow_map.h" />
     <ClInclude Include="cube_map.h" />
     <ClInclude Include="hw_framebuffer.h" />
+    <ClInclude Include="CGInterface.h" />
+    <ClInclude Include="tetris.h" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="CG">
@@ -32,9 +36,8 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <None Include="CG\shaderOne.cg">
-      <Filter>CG</Filter>
-    </None>
     <None Include="hw" />
+    <None Include="cg CG\shaderOne.cg" />
+    <None Include="CG\ShaderWithLoops.cg" />
   </ItemGroup>
 </Project>
