@@ -64,7 +64,8 @@ void FrameBuffer::KeyboardHandle() {
 			break;
 		}
 		case 'f':
-		case 'F': {
+		case 'F':
+		case '.': {
 			scene->tetris_game->set_move(4);
 			break;
 		}

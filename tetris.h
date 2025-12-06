@@ -3,15 +3,6 @@
 #include <random>
 #include <chrono>
 
-struct Piece {
-	int x1, y1;
-	int x2, y2;
-	int x3, y3;
-	int x4, y4;
-
-	unsigned int color;
-};
-
 enum class PieceType {
 	S = 0,
 	Z = 1,
@@ -19,7 +10,17 @@ enum class PieceType {
 	J = 3,
 	T = 4,
 	I = 5,
-	B = 6
+	O = 6
+};
+
+struct Piece {
+	int x1, y1;
+	int x2, y2;
+	int x3, y3;
+	int x4, y4;
+
+	unsigned int color;
+	PieceType piece_type;
 };
 
 class Tetris {
@@ -40,7 +41,11 @@ private:
 	int next_piece;
 	Piece curr_piece;
 
-	chrono::time_point<std::chrono::steady_clock> last_frame_time;
+	random_device rd;
+	mt19937 generator{rd()};
+	uniform_int_distribution<> random_numbers{0, 6};
+
+	chrono::time_point<chrono::steady_clock> last_frame_time;
 
 	//0 for nothing, 1 for left move, 2 for right move, 
 	//3 for left rotate, 4 for right rotate, 5 for push down
@@ -54,6 +59,8 @@ private:
 	bool collision_check(Piece piece);
 	bool bounds_check(Piece piece);
 	void clear_lines();
+
+	void rotate_piece(Piece& piece, bool right);
 
 	void draw_board_to_fb();
 	void reset_board();

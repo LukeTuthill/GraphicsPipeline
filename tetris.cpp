@@ -1,4 +1,5 @@
 #include "tetris.h"
+#include <iostream>
 
 using namespace std;
 
@@ -23,44 +24,44 @@ Tetris::Tetris(FrameBuffer* fb, int width, int height) {
 	starting_pieces[0] = { half_width, 0,
 		half_width + 1, 0,
 		half_width - 1, 1,
-		half_width, 1, BLUE
-	}; //S
+		half_width, 1, BLUE, PieceType::S
+	};
 
 	starting_pieces[1] = { half_width - 1, 0,
 		half_width, 0,
 		half_width, 1,
-		half_width + 1, 1, RED
-	}; //Z
+		half_width + 1, 1, RED, PieceType::Z
+	};
 
 	starting_pieces[2] = { half_width, 0,
 		half_width, 1,
 		half_width, 2,
-		half_width + 1, 2, RED
-	}; //L
+		half_width + 1, 2, RED, PieceType::L
+	};
 
 	starting_pieces[3] = { half_width, 0,
 		half_width, 1,
 		half_width, 2,
-		half_width - 1, 2, BLUE
-	}; //J
+		half_width - 1, 2, BLUE, PieceType::J
+	};
 
 	starting_pieces[4] = { half_width - 1, 0,
 		half_width, 0,
 		half_width + 1, 0,
-		half_width, 1, WHITE
-	}; //T
+		half_width, 1, WHITE, PieceType::T
+	};
 
 	starting_pieces[5] = { half_width, 0,
 		half_width, 1,
 		half_width, 2,
-		half_width, 3, WHITE
-	}; //I
+		half_width, 3, WHITE, PieceType::I
+	};
 
 	starting_pieces[6] = { half_width, 0,
 		half_width + 1, 0,
 		half_width, 1,
-		half_width + 1, 1, WHITE
-	}; //B
+		half_width + 1, 1, WHITE, PieceType::O
+	};
 
 	//Set game variables
 	score = 0;
@@ -84,18 +85,25 @@ void Tetris::game_loop() {
 	if (move_with_collision_check(curr_piece, next_move, move_down)) {
 		//Spawn new piece
 		curr_piece = starting_pieces[next_piece];
-		curr_piece = starting_pieces[6];
 		next_piece = get_random_piece();
 		
 		clear_lines();
-	}
+		cout << "Score: " << score << "\r";
 
+		if (collision_check(curr_piece)) {
+			//Game over
+			cout << endl << "Game Over! Final Score: " << score << endl;
+			reset_board();
+			score = 0;
+		}
+	}
 
 	//Always reset player move after processing
 	next_move = 0;
 }
 
 void Tetris::clear_lines() {
+	int total_lines = 0;
 	for (int h = 0; h < height; h++) {
 		bool line_full = true;
 		for (int w = 0; w < width; w++) {
@@ -105,11 +113,11 @@ void Tetris::clear_lines() {
 			}
 		}
 		if (line_full) {
+			total_lines++;
 			// Clear the line
 			for (int w = 0; w < width; w++) {
 				set_color(w, h, BLACK);
 			}
-			score += 100; // Increment score
 
 			//Move lines down
 			for (int line = h - 1; line >= 0; line--) {
@@ -118,6 +126,23 @@ void Tetris::clear_lines() {
 				}
 			}
 		}
+	}
+	
+	switch (total_lines) {
+	case 0:
+		break;
+	case 1:
+		score += 40;
+		break;
+	case 2:
+		score += 100;
+		break;
+	case 3:
+		score += 300;
+		break;
+	case 4:
+		score += 1200;
+		break;
 	}
 }
 
@@ -133,18 +158,24 @@ bool Tetris::move_with_collision_check(Piece& curr_piece, int move, bool move_do
 
 	//Piece is virtual until redrawn, so we can check for collisions first
 	switch (move) {
-		case 1: //Left move
-			curr_piece.x1--;
-			curr_piece.x2--;
-			curr_piece.x3--;
-			curr_piece.x4--;
-			break;
-		case 2: //Right move
-			curr_piece.x1++;
-			curr_piece.x2++;
-			curr_piece.x3++;
-			curr_piece.x4++;
-			break;
+	case 1: //Left move
+		curr_piece.x1--;
+		curr_piece.x2--;
+		curr_piece.x3--;
+		curr_piece.x4--;
+		break;
+	case 2: //Right move
+		curr_piece.x1++;
+		curr_piece.x2++;
+		curr_piece.x3++;
+		curr_piece.x4++;
+		break;
+	case 3: //Left Rotate
+		rotate_piece(curr_piece, false);
+		break;
+	case 4: //Right Rotate
+		rotate_piece(curr_piece, true);
+		break;
 	}
 
 	//Check for collision with other pieces after move
@@ -170,8 +201,52 @@ bool Tetris::move_with_collision_check(Piece& curr_piece, int move, bool move_do
 
 	//Redraw piece
 	draw_piece(curr_piece);
-	
-	return (curr_piece.y4 >= height - 1); //Checks for floor collision
+
+	//Checks for floor collision
+	return (curr_piece.y1 >= height - 1 ||
+		curr_piece.y2 >= height - 1 ||
+		curr_piece.y3 >= height - 1 ||
+		curr_piece.y4 >= height - 1);
+}
+
+void Tetris::rotate_piece(Piece& piece, bool right) {
+	if (piece.piece_type == PieceType::O) {
+		return; //No rotation for a square piece
+	}
+
+	int x_center = piece.x2;
+	int y_center = piece.y2;
+
+	int diff_x1 = piece.x1 - x_center;
+	int diff_y1 = piece.y1 - y_center;
+
+	int diff_x3 = piece.x3 - x_center;
+	int diff_y3 = piece.y3 - y_center;
+
+	int diff_x4 = piece.x4 - x_center;
+	int diff_y4 = piece.y4 - y_center;
+
+
+	if (right) {
+		piece.x1 = x_center + diff_y1;
+		piece.y1 = y_center - diff_x1;
+
+		piece.x3 = x_center + diff_y3;
+		piece.y3 = y_center - diff_x3;
+
+		piece.x4 = x_center + diff_y4;
+		piece.y4 = y_center - diff_x4;
+	}
+	else {
+		piece.x1 = x_center - diff_y1;
+		piece.y1 = y_center + diff_x1;
+		
+		piece.x3 = x_center - diff_y3;
+		piece.y3 = y_center + diff_x3;
+
+		piece.x4 = x_center - diff_y4;
+		piece.y4 = y_center + diff_x4;
+	}
 }
 
 bool Tetris::collision_check(Piece piece) {
@@ -234,5 +309,5 @@ void Tetris::clear_piece(Piece piece) {
 }
 
 int Tetris::get_random_piece() {
-	return rand() % 7;
+	return random_numbers(generator);
 }
