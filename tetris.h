@@ -35,10 +35,11 @@ public:
 private:
 	int score;
 	unsigned int* board;
+	unsigned int* next_piece_board;
 	int width, height;
 
 	Piece starting_pieces[7];
-	int next_piece;
+	PieceType next_piece;
 	Piece curr_piece;
 
 	random_device rd;
@@ -66,9 +67,10 @@ private:
 	void reset_board();
 	void draw_piece(Piece piece);
 	void clear_piece(Piece piece);
+	void draw_next_piece(Piece piece);
 
 	unsigned int get_color(int x, int y);
 	void set_color(int x, int y, unsigned int color);
 
-	int get_random_piece();
+	PieceType get_random_piece();
 };

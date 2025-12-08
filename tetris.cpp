@@ -18,6 +18,8 @@ Tetris::Tetris(FrameBuffer* fb, int width, int height) {
 		board[i] = BLACK;
 	}
 
+	next_piece_board = new unsigned int[4 * 4];
+	
 	//Define starting pieces
 	int half_width = width / 2;
 
@@ -33,10 +35,10 @@ Tetris::Tetris(FrameBuffer* fb, int width, int height) {
 		half_width + 1, 1, RED, PieceType::Z
 	};
 
-	starting_pieces[2] = { half_width, 0,
-		half_width, 1,
-		half_width, 2,
-		half_width + 1, 2, RED, PieceType::L
+	starting_pieces[2] = { half_width - 1, 0,
+		half_width - 1, 1,
+		half_width - 1, 2,
+		half_width, 2, RED, PieceType::L
 	};
 
 	starting_pieces[3] = { half_width, 0,
@@ -57,17 +59,18 @@ Tetris::Tetris(FrameBuffer* fb, int width, int height) {
 		half_width, 3, WHITE, PieceType::I
 	};
 
-	starting_pieces[6] = { half_width, 0,
-		half_width + 1, 0,
-		half_width, 1,
-		half_width + 1, 1, WHITE, PieceType::O
+	starting_pieces[6] = { half_width - 1, 0,
+		half_width, 0,
+		half_width - 1, 1,
+		half_width, 1, WHITE, PieceType::O
 	};
 
 	//Set game variables
 	score = 0;
-	curr_piece = starting_pieces[get_random_piece()];
+	curr_piece = starting_pieces[static_cast<int>(get_random_piece())];
 	draw_piece(curr_piece);
 	next_piece = get_random_piece();
+	draw_next_piece(starting_pieces[static_cast<int>(next_piece)]);
 	next_move = 0;
 	last_frame_time = chrono::steady_clock::now();
 }
@@ -84,8 +87,9 @@ void Tetris::game_loop() {
 
 	if (move_with_collision_check(curr_piece, next_move, move_down)) {
 		//Spawn new piece
-		curr_piece = starting_pieces[next_piece];
+		curr_piece = starting_pieces[static_cast<int>(next_piece)];
 		next_piece = get_random_piece();
+		draw_next_piece(starting_pieces[static_cast<int>(next_piece)]);
 		
 		clear_lines();
 		cout << "Score: " << score << "\r";
@@ -284,6 +288,14 @@ void Tetris::draw_board_to_fb() {
 			fb->draw_rectangle(start_u + x * step, start_v + y * step, step, step, get_color(x, y));
 		}
 	}
+
+	//Draw next piece
+	for (int x = 0; x < 4; x++) {
+		for (int y = 0; y < 4; y++) {
+			fb->draw_rectangle(end_u + step * (x + 1), start_v + step * (y + 1),
+				step, step, next_piece_board[x * 4 + y]);
+		}
+	}
 }
 
 unsigned int Tetris::get_color(int x, int y) {
@@ -308,6 +320,25 @@ void Tetris::clear_piece(Piece piece) {
 	set_color(piece.x4, piece.y4, BLACK);
 }
 
-int Tetris::get_random_piece() {
-	return random_numbers(generator);
+void Tetris::draw_next_piece(Piece piece) {
+	//Clear next piece board
+	for (int i = 0; i < 16; i++) {
+		next_piece_board[i] = BLACK;
+	}
+	if (piece.piece_type != PieceType::I) {
+		piece.y1++;
+		piece.y2++;
+		piece.y3++;
+		piece.y4++;
+	}
+	int offset = width / 2 - 2;
+	//Draw piece in next piece board
+	next_piece_board[(piece.x1 - offset) * 4 + (piece.y1)] = piece.color;
+	next_piece_board[(piece.x2 - offset) * 4 + (piece.y2)] = piece.color;
+	next_piece_board[(piece.x3 - offset) * 4 + (piece.y3)] = piece.color;
+	next_piece_board[(piece.x4 - offset) * 4 + (piece.y4)] = piece.color;
+}
+
+PieceType Tetris::get_random_piece() {
+	return static_cast<PieceType>(random_numbers(generator));
 }
