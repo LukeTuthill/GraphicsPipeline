@@ -1,4 +1,3 @@
-Assignment 9:
 Keyboard controls:
 b to run saved camera path
 u to save current fb to tiff
@@ -28,6 +27,3 @@ a and d for revolution left and right
 r and f for roll
 
 c to switch between rendering wireframe and filled in for hardware rendering
-
-DID OPTION 1
-Executable and video is in zip file
